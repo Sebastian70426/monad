@@ -1,6 +1,12 @@
 # 🎓 Monad — AI 学习助手
 
+> AI-powered desktop learning assistant for engineering students.
+> Upload lecture recordings → AI generates structured study notes.
+> Built with Python + Eel, powered by DeepSeek & faster-whisper.
+
 > 面向大学工程学生的桌面 AI 学习工具。上传课堂录音，自动生成结构化学习笔记。
+
+---
 
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![Eel](https://img.shields.io/badge/Eel-Desktop-333?logo=electron&logoColor=white)
