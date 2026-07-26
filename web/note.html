@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>笔记 - AI学习助手</title>
+    <script type="text/javascript" src="/eel.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #1a1a2e; color: #eee;
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            height: 100vh; display: flex;
+        }
+        .sidebar {
+            width: 220px; background: #16213e; padding: 24px 16px;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .sidebar .logo {
+            font-size: 20px; font-weight: bold; margin-bottom: 24px; color: #fff; cursor: pointer;
+        }
+        .sidebar .nav-item {
+            padding: 10px 12px; border-radius: 6px; cursor: pointer; color: #aaa; font-size: 15px;
+        }
+        .sidebar .nav-item:hover, .sidebar .nav-item.active {
+            background: #0f3460; color: #fff;
+        }
+        .main { flex: 1; padding: 32px; overflow-y: auto; }
+        .main .back { color: #888; cursor: pointer; font-size: 14px; margin-bottom: 8px; }
+        .main .back:hover { color: #fff; }
+        .main h2 { font-size: 24px; margin-bottom: 8px; color: #fff; }
+        .main .date { font-size: 13px; color: #888; margin-bottom: 24px; }
+
+        .note-content {
+            background: #16213e; border-radius: 8px; padding: 24px;
+            color: #ccc; line-height: 1.9; font-size: 15px;
+        }
+        .note-content h1, .note-content h2, .note-content h3 {
+            color: #fff; margin: 20px 0 10px;
+        }
+        .note-content h3 { font-size: 16px; }
+        .note-content ul { margin-left: 20px; }
+        .note-content li { margin: 6px 0; }
+
+        .section {
+            background: #16213e; border-radius: 8px; padding: 24px; margin-bottom: 16px;
+        }
+        .section .section-title {
+            font-size: 14px; color: #888; margin-bottom: 12px; cursor: pointer;
+        }
+        .section .section-title:hover { color: #fff; }
+        .section .section-body {
+            color: #ccc; line-height: 1.8; font-size: 15px;
+            max-height: 300px; overflow-y: auto;
+        }
+        .section .section-body.collapsed { display: none; }
+
+        .btn-copy {
+            padding: 8px 16px; background: #4a90d9; color: #fff;
+            border: none; border-radius: 6px; cursor: pointer; font-size: 14px; margin-top: 16px;
+        }
+        .btn-copy:hover { background: #3a7bc8; }
+
+        .loading { color: #888; text-align: center; margin-top: 60px; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="logo" onclick="window.location.href='index.html'">🎓 AI学习助手</div>
+    <div class="nav-item" onclick="window.location.href='index.html'">📚 我的课程</div>
+    <div class="nav-item" onclick="window.location.href='upload.html'">🎤 新录音</div>
+    <div class="nav-item" onclick="window.location.href='settings.html'">⚙️ 设置</div>
+</div>
+
+<div class="main">
+    <div class="back" id="backLink">← 返回课程</div>
+    <h2 id="lectureTitle">加载中...</h2>
+    <div class="date" id="lectureDate"></div>
+
+    <div id="contentArea">
+        <div class="loading">加载中...</div>
+    </div>
+</div>
+
+<script>
+async function init() {
+    let params = new URLSearchParams(window.location.search);
+    let lectureId = params.get('lecture_id');
+    if (!lectureId) {
+        window.location.href = 'index.html';
+        return;
+    }
+
+    let result = await eel.api_get_lecture(parseInt(lectureId))();
+    if (!result.success) {
+        document.getElementById('contentArea').innerHTML = '<div class="loading">课堂记录不存在</div>';
+        return;
+    }
+
+    let lecture = result.lecture;
+    document.getElementById('lectureTitle').textContent = '📝 ' + lecture.title;
+    document.getElementById('lectureDate').textContent = lecture.created_at;
+    document.getElementById('backLink').onclick = function() {
+        window.location.href = 'course.html?course_id=' + lecture.course_id;
+    };
+
+    let html = '';
+
+    // 笔记
+    if (lecture.note) {
+        let noteHtml = formatMarkdown(lecture.note);
+        html += `
+            <div class="note-content">${noteHtml}</div>
+            <button class="btn-copy" onclick="copyNote()">📋 复制笔记</button>`;
+    } else {
+        html += '<div class="section"><div class="section-title">⚠️ 尚未生成笔记</div></div>';
+    }
+
+    // 转录文本（可折叠）
+    if (lecture.transcript) {
+        html += `
+            <div class="section" style="margin-top:16px;">
+                <div class="section-title" onclick="toggleTranscript()">📜 原始转录文字 ▾</div>
+                <div class="section-body collapsed" id="transcriptBody">${escapeHtml(lecture.transcript)}</div>
+            </div>`;
+    }
+
+    document.getElementById('contentArea').innerHTML = html;
+
+    // 保存笔记文本用于复制
+    window._noteText = lecture.note || '';
+}
+
+function formatMarkdown(text) {
+    // 简单 Markdown 转 HTML
+    let html = text
+        .replace(/### (.+)/g, '<h3>$1</h3>')
+        .replace(/## (.+)/g, '<h2>$1</h2>')
+        .replace(/# (.+)/g, '<h1>$1</h1>')
+        .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+        .replace(/- (.+)/g, '<li>$1</li>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>');
+    html = '<p>' + html + '</p>';
+    html = html.replace(/<li>/g, '<ul><li>').replace(/<\/li>/g, '</li></ul>');
+    html = html.replace(/<\/ul><ul>/g, '');
+    return html;
+}
+
+function escapeHtml(text) {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function toggleTranscript() {
+    let body = document.getElementById('transcriptBody');
+    if (body) {
+        body.classList.toggle('collapsed');
+    }
+}
+
+async function copyNote() {
+    await navigator.clipboard.writeText(window._noteText);
+    alert('笔记已复制到剪贴板');
+}
+
+init();
+</script>
+
+</body>
+</html>
