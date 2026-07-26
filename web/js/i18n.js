@@ -4,9 +4,9 @@ const i18n = {
 
   _data: {
     en: {
-      "app": {"titlebar": "AI Study Assistant"},
+      "app": {"titlebar": "Monad"},
       "sidebar": {
-        "logo": "AIStudyBuddy",
+        "logo": "Monad",
         "sections": {"study":"Study","ai":"AI","system":"System"},
         "dashboard":"Dashboard","courses":"Courses","lectureAnalysis":"Lecture Analysis",
         "aiTutor":"AI Tutor","knowledgeBase":"Knowledge Base","settings":"Settings",
@@ -29,9 +29,9 @@ const i18n = {
       "common":{"loading":"Loading...","back":"Back","cancel":"Cancel","confirm":"Confirm","delete":"Delete","export":"Export","copy":"Copy","viewAll":"View All","noData":"No data"}
     },
     zh: {
-      "app": {"titlebar": "AI 学习助手"},
+      "app": {"titlebar": "Monad"},
       "sidebar": {
-        "logo": "AIStudyBuddy",
+        "logo": "Monad",
         "sections": {"study":"学习","ai":"智能","system":"系统"},
         "dashboard":"仪表盘","courses":"课程","lectureAnalysis":"录音分析",
         "aiTutor":"AI Tutor","knowledgeBase":"知识库","settings":"设置",
