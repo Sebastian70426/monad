@@ -51,25 +51,28 @@
 ---
 
 ## 📁 项目结构
-monad/                         
-├── main.py # 入口，注册所有 eel.expose API
-├── config.py # 全局路径配置
-├── db.py # SQLite 数据库封装
+
+```text
+monad/
+├── main.py             # 入口，注册所有 eel.expose API
+├── config.py           # 全局路径配置
+├── db.py               # SQLite 数据库封装
 ├── utils/
-│ └── file_utils.py # 音频文件验证、复制
+│   └── file_utils.py   # 音频文件验证、复制
 ├── web/
-│ ├── index.html # SPA Shell + 所有页面模板
-│ ├── css/
-│ │ └── design-system.css # Design System (CSS 变量)
-│ ├── js/
-│ │ └── i18n.js # 翻译引擎 (中/英)
-│ └── locales/ # 备用的 JSON 翻译文件
-├── data/ # 运行时数据 (自动创建)
-│ ├── database.db
-│ └── audio/
+│   ├── index.html      # SPA Shell + 所有页面模板
+│   ├── css/
+│   │   └── design-system.css # 设计系统 (CSS 变量)
+│   ├── js/
+│   │   └── i18n.js     # 翻译引擎 (中/英)
+│   └── locales/        # 备用的 JSON 翻译文件
+├── data/               # 运行时数据 (自动创建)
+│   ├── database.db
+│   └── audio/
 ├── requirements.txt
-├── screenshots/ # 应用截图
+├── snapshots/          # 应用截图
 └── README.md
+```
 
 
 ## 🚀 快速开始
