@@ -1,0 +1,4 @@
+eel
+faster-whisper
+openai
+pydub

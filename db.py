@@ -11,10 +11,7 @@ def get_connection():
 
 
 def init_db():
-    """初始化数据库和表"""
-    # 确保数据目录存在
     os.makedirs(DATA_DIR, exist_ok=True)
-
     conn = get_connection()
     conn.executescript('''
         CREATE TABLE IF NOT EXISTS courses (
@@ -38,10 +35,42 @@ def init_db():
             key         TEXT PRIMARY KEY,
             value       TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS documents (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            course_id   INTEGER NOT NULL,
+            filename    TEXT    NOT NULL,
+            file_path   TEXT    NOT NULL,
+            file_type   TEXT    NOT NULL,
+            content     TEXT,
+            chunk_count INTEGER DEFAULT 0,
+            created_at  TEXT    DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (course_id) REFERENCES courses(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            course_id   INTEGER,
+            lecture_id  INTEGER,
+            title       TEXT    DEFAULT 'New Chat',
+            created_at  TEXT    DEFAULT (datetime('now','localtime')),
+            updated_at  TEXT    DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (course_id) REFERENCES courses(id),
+            FOREIGN KEY (lecture_id) REFERENCES lectures(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id  INTEGER NOT NULL,
+            role        TEXT    NOT NULL,
+            content     TEXT    NOT NULL,
+            sources     TEXT,
+            created_at  TEXT    DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (session_id) REFERENCES chat_sessions(id)
+        );
     ''')
     conn.commit()
     conn.close()
-
 
 def execute(sql, params=()):
     """执行写操作，返回最后插入的ID"""
