@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from contextlib import contextmanager
 from config import DB_PATH, DATA_DIR
 
 
@@ -7,13 +8,36 @@ def get_connection():
     """获取数据库连接"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
-def init_db():
-    os.makedirs(DATA_DIR, exist_ok=True)
+@contextmanager
+def get_db():
+    """上下文管理器：自动 commit / rollback / close。
+
+    用法：
+        with get_db() as conn:
+            conn.execute("INSERT INTO ...")
+            conn.execute("UPDATE ...")
+        # 退出时自动 commit；如果中间抛异常，自动 rollback
+    """
     conn = get_connection()
-    conn.executescript('''
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def init_db():
+    """初始化数据库表"""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with get_db() as conn:
+        conn.executescript('''
         CREATE TABLE IF NOT EXISTS courses (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             name        TEXT    NOT NULL UNIQUE,
@@ -68,31 +92,25 @@ def init_db():
             created_at  TEXT    DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (session_id) REFERENCES chat_sessions(id)
         );
-    ''')
-    conn.commit()
-    conn.close()
+        ''')
+
 
 def execute(sql, params=()):
-    """执行写操作，返回最后插入的ID"""
-    conn = get_connection()
-    cursor = conn.execute(sql, params)
-    conn.commit()
-    last_id = cursor.lastrowid
-    conn.close()
-    return last_id
+    """执行写操作，返回最后插入的 ID"""
+    with get_db() as conn:
+        cursor = conn.execute(sql, params)
+        return cursor.lastrowid
 
 
 def query(sql, params=()):
     """查询多条记录，返回字典列表"""
-    conn = get_connection()
-    rows = conn.execute(sql, params).fetchall()
-    conn.close()
-    return [dict(row) for row in rows]
+    with get_db() as conn:
+        rows = conn.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
 
 
 def query_one(sql, params=()):
     """查询单条记录"""
-    conn = get_connection()
-    row = conn.execute(sql, params).fetchone()
-    conn.close()
-    return dict(row) if row else None
+    with get_db() as conn:
+        row = conn.execute(sql, params).fetchone()
+        return dict(row) if row else None

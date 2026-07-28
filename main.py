@@ -205,7 +205,7 @@ def api_upload_document(file_path, course_id):
     api_key = query_one("SELECT value FROM settings WHERE key='deepseek_key'")
     if api_key and api_key['value']:
         try:
-            chunk_count = index_document(doc_id, content, api_key['value'])
+            chunk_count = index_document(doc_id, content)
             execute("UPDATE documents SET chunk_count = ? WHERE id = ?", (chunk_count, doc_id))
         except Exception as e:
             print(f"RAG indexing failed: {e}")
@@ -269,7 +269,7 @@ def api_generate_note(lecture_id):
     rag_context = ""
     if doc_ids:
         try:
-            rag_context = retrieve_context(doc_ids, lecture['transcript'], api_key['value'])
+            rag_context = retrieve_context(doc_ids, lecture['transcript'])
         except Exception as e:
             print(f"RAG retrieval failed: {e}")
 

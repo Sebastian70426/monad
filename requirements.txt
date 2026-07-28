@@ -1,4 +1,21 @@
+# ===== Web 框架 =====
 eel
+
+# ===== 语音转写 =====
 faster-whisper
+
+# ===== LLM API =====
 openai
+
+# ===== 音频处理 =====
 pydub
+
+# ===== RAG 向量检索 =====
+chromadb
+
+# ===== Embedding & Reranking（Phase 0 新增）=====
+sentence-transformers
+
+# ===== 文档解析 =====
+PyMuPDF
+python-pptx
