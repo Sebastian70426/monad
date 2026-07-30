@@ -1,6 +1,6 @@
 import os
 from openai import OpenAI
-from services.rag_service import retrieve_context
+from services.rag_service import retrieve_with_metadata
 from repos import chat_repo, document_repo
 
 
@@ -60,7 +60,7 @@ def _load_history(session_id, n=6):
 
 
 def _retrieve(course_id, lecture_id, message, api_key):
-    """检索相关课程资料"""
+    """检索相关课程资料，返回 (context, sources)"""
     doc_ids = []
     if course_id:
         doc_ids = document_repo.get_ids_with_chunks(course_id)
@@ -69,9 +69,13 @@ def _retrieve(course_id, lecture_id, message, api_key):
         return "", []
 
     try:
-        context = retrieve_context(doc_ids, message, api_key, top_k=5)
-        sources = [{"id": did} for did in doc_ids]
-        return context, sources
+        result = retrieve_with_metadata(doc_ids, message, api_key, top_k=5)
+        # 提取简洁的来源信息（页码 + 文件名）
+        sources = [
+            {"page": s.get("page"), "source": s.get("source")}
+            for s in result["sources"]
+        ]
+        return result["context"], sources
     except Exception:
         return "", []
 
@@ -81,11 +85,9 @@ def _generate(intent, history, rag_context, message, api_key):
     client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
     system_prompt = _load_prompt(intent)
 
-    # 注入 RAG 上下文
     if rag_context:
         system_prompt += f"\n\n## 课程参考资料\n{rag_context}\n\n请优先参考以上资料回答。"
 
-    # 组装对话消息
     messages = [{"role": "system", "content": system_prompt}]
     for h in history:
         messages.append({"role": h['role'], "content": h['content']})
@@ -102,16 +104,9 @@ def _generate(intent, history, rag_context, message, api_key):
 
 def tutor_chat(session_id, course_id, lecture_id, message, api_key):
     """AI Tutor 核心函数:接收用户消息,返回 AI 回复。"""
-    # 1. 意图检测
     intent = _detect_intent(message, api_key)
-
-    # 2. 加载历史
     history = _load_history(session_id)
-
-    # 3. RAG 检索
     rag_context, sources = _retrieve(course_id, lecture_id, message, api_key)
-
-    # 4. LLM 生成
     reply = _generate(intent, history, rag_context, message, api_key)
 
     return {

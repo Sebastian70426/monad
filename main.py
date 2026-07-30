@@ -104,7 +104,6 @@ def api_get_course(course_id):
 
 @eel.expose
 def api_delete_course(course_id):
-    # 级联删除：先删子表，再删父表
     lecture_repo.delete_by_course(course_id)
     document_repo.delete_by_course(course_id)
     course_repo.delete(course_id)
@@ -138,7 +137,6 @@ def api_select_audio_file():
 
 @eel.expose
 def api_select_document_file():
-    """打开系统文件选择对话框,选择 PDF/PPT/TXT 文件"""
     root = tk.Tk()
     root.withdraw()
     root.attributes('-topmost', True)
@@ -176,7 +174,7 @@ def api_copy_audio(file_path, course_id):
 @eel.expose
 def api_upload_document(file_path, course_id):
     """解析文档,提取文本,保存到数据库,并建立向量索引"""
-    from services.document_service import extract_text
+    from services.document_service import extract_structured
     from utils.file_utils import copy_to_data_dir
 
     ext = os.path.splitext(file_path)[1].lower()
@@ -184,25 +182,29 @@ def api_upload_document(file_path, course_id):
         return {"success": False, "error": f"不支持的文件格式: {ext}"}
 
     dest = copy_to_data_dir(file_path, course_id)
+    filename = os.path.basename(file_path)
 
     try:
-        content = extract_text(dest, ext)
+        sections = extract_structured(dest, ext, filename)
     except Exception as e:
         return {"success": False, "error": f"文本提取失败: {str(e)}"}
+
+    # 拼接为纯文本存入数据库
+    content = "\n\n".join(s["text"] for s in sections)
 
     if not content or len(content.strip()) < 50:
         return {"success": False, "error": "文件内容过短或无法提取文本(可能是扫描版PDF)"}
 
     # 存到数据库
     doc_id = document_repo.create(
-        course_id, os.path.basename(file_path), dest, ext, content
+        course_id, filename, dest, ext, content
     )
 
-    # RAG 索引:向量化并存入 ChromaDB
+    # RAG 索引:用结构化 sections 向量化并存入 ChromaDB
     api_key = settings_repo.get('deepseek_key')
     if api_key:
         try:
-            chunk_count = index_document(doc_id, content)
+            chunk_count = index_document(doc_id, sections)
             document_repo.update_chunk_count(doc_id, chunk_count)
         except Exception as e:
             print(f"RAG indexing failed: {e}")
@@ -213,7 +215,6 @@ def api_upload_document(file_path, course_id):
 
 @eel.expose
 def api_get_documents(course_id):
-    """获取某课程下所有文档"""
     docs = document_repo.get_meta_by_course(course_id)
     return {"success": True, "documents": docs}
 
@@ -222,7 +223,6 @@ def api_get_documents(course_id):
 
 @eel.expose
 def api_transcribe_audio(audio_path, course_id):
-    """转录音频,创建课堂记录并保存转录文本,返回 lecture_id"""
     try:
         transcript = transcribe(audio_path)
         title = time.strftime("%Y-%m-%d %H:%M 课堂录音")
@@ -234,7 +234,6 @@ def api_transcribe_audio(audio_path, course_id):
 
 @eel.expose
 def api_generate_note(lecture_id):
-    """为指定课堂记录生成笔记并保存(含RAG检索增强)"""
     lecture = lecture_repo.get_by_id(lecture_id)
     if not lecture:
         return {"success": False, "error": "课堂记录不存在"}
@@ -327,7 +326,6 @@ def api_tutor_chat(session_id, message):
     if not session:
         return {"success": False, "error": "对话会话不存在"}
 
-    # 保存用户消息
     chat_repo.add_message(session_id, 'user', message)
 
     from services.tutor_service import tutor_chat
@@ -339,11 +337,8 @@ def api_tutor_chat(session_id, message):
         api_key=api_key
     )
 
-    # 保存 AI 回复
     sources_json = str(result.get('sources', []))
     chat_repo.add_message(session_id, 'assistant', result['reply'], sources_json)
-
-    # 更新会话时间戳
     chat_repo.touch_session(session_id)
 
     return {
