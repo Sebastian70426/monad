@@ -92,6 +92,33 @@ def init_db():
             created_at  TEXT    DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (session_id) REFERENCES chat_sessions(id)
         );
+
+        CREATE TABLE IF NOT EXISTS quizzes (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            course_id   INTEGER NOT NULL,
+            lecture_id  INTEGER,
+            question    TEXT    NOT NULL,
+            options     TEXT,
+            answer      TEXT    NOT NULL,
+            explanation TEXT,
+            difficulty  TEXT    DEFAULT 'medium',
+            created_at  TEXT    DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (course_id) REFERENCES courses(id),
+            FOREIGN KEY (lecture_id) REFERENCES lectures(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS reviews (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            quiz_id     INTEGER NOT NULL,
+            quality     INTEGER NOT NULL,
+            ease_factor REAL    DEFAULT 2.5,
+            interval    INTEGER DEFAULT 1,
+            repetitions INTEGER DEFAULT 0,
+            next_review TEXT    NOT NULL,
+            last_review TEXT,
+            created_at  TEXT    DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (quiz_id) REFERENCES quizzes(id)
+        );
         ''')
 
 

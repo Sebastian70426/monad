@@ -168,6 +168,10 @@ body{display:flex;flex-direction:column;height:100vh}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
     <span data-i18n="sidebar.knowledgeBase">知识库</span>
   </div>
+  <div class="nav-item" data-page="review">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    <span>复习</span>
+  </div>
   <div class="sec-label" data-i18n="sidebar.sections.system">系统</div>
   <div class="nav-item" data-page="settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -285,6 +289,36 @@ body{display:flex;flex-direction:column;height:100vh}
   </div>
 </div></template>
 
+<template id="tpl-review"><div class="page-view">
+  <div class="page-title">复习中心</div>
+  <div class="page-sub">基于 SM-2 间隔重复算法的智能复习系统</div>
+  <div class="two-col" style="margin-bottom:var(--space-6)">
+    <div class="panel">
+      <div class="panel-header">今日待复习</div>
+      <div id="reviewDueCount" style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--accent)">0</div>
+      <div style="font-size:var(--text-sm);color:var(--text-tertiary);margin-top:4px">道题目等待复习</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">总题库</div>
+      <div id="reviewTotalCount" style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--text-primary)">0</div>
+      <div style="font-size:var(--text-sm);color:var(--text-tertiary);margin-top:4px">道题目已生成</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-6)">
+    <select class="lang-select" id="reviewCourseSelect" style="flex:1">
+      <option value="">选择课程</option>
+    </select>
+    <button class="btn-test" onclick="generateQuizzes()" style="height:36px;white-space:nowrap">生成测验题</button>
+    <button class="btn-test" onclick="startReview()" style="height:36px;white-space:nowrap">开始复习</button>
+  </div>
+  <div id="reviewStatus" class="status-msg" style="margin-bottom:var(--space-4)"></div>
+  <div id="reviewQuizArea"></div>
+  <div class="panel" style="margin-top:var(--space-6)">
+    <div class="panel-header">所有测验题</div>
+    <div id="reviewQuizList"></div>
+  </div>
+</div></template>
+
 <template id="tpl-settings"><div class="page-view">
   <div class="page-title" data-i18n="settings.title">设置</div>
   <div class="settings-card">
@@ -397,7 +431,7 @@ function mountPage(page, tpl) {
   _currentPage = page;
   var initMap = {
     'dashboard': initDashboard, 'courses': initCourses, 'course-detail': initCourseDetail,
-    'note': initNote, 'upload': initUpload, 'settings': initSettings, 'knowledge': initKnowledge, 'tutor': initTutor
+    'note': initNote, 'upload': initUpload, 'settings': initSettings, 'knowledge': initKnowledge, 'tutor': initTutor, 'review': initReview
   };
   if (initMap[page]) initMap[page]();
   if (i18n._loaded) i18n.applyTranslations();
@@ -828,6 +862,186 @@ async function startProcess() {
   document.getElementById('uploadZone').classList.remove('hidden');
   document.getElementById('fileInfo').classList.add('hidden');
   if (btn) { btn.disabled = true; btn.textContent = i18n.t('upload.btnStartDisabled'); }
+}
+
+// ── Review & Quiz ──
+var _reviewQueue = [];
+var _reviewIndex = 0;
+var _reviewAnswers = {};
+
+async function initReview() {
+  _reviewQueue = [];
+  _reviewIndex = 0;
+  _reviewAnswers = {};
+  document.getElementById('reviewQuizArea').innerHTML = '';
+  document.getElementById('reviewStatus').textContent = '';
+  var r = await eel.api_list_courses()();
+  var s = document.getElementById('reviewCourseSelect');
+  if (!s) return;
+  var h = '<option value="">选择课程</option>';
+  for (var i = 0; i < r.courses.length; i++) h += '<option value="'+r.courses[i].id+'">'+r.courses[i].name+'</option>';
+  s.innerHTML = h;
+  await refreshReviewStats();
+  await loadQuizList();
+}
+
+async function refreshReviewStats() {
+  var cid = document.getElementById('reviewCourseSelect').value || null;
+  var r = await eel.api_get_review_stats(cid)();
+  if (r.success) {
+    document.getElementById('reviewDueCount').textContent = r.stats.due_today;
+    document.getElementById('reviewTotalCount').textContent = r.stats.total;
+  }
+}
+
+async function loadQuizList() {
+  var cid = document.getElementById('reviewCourseSelect').value;
+  if (!cid) { document.getElementById('reviewQuizList').innerHTML = '<div style="color:var(--text-tertiary);font-size:var(--text-sm)">请选择课程</div>'; return; }
+  var r = await eel.api_get_quizzes(parseInt(cid))();
+  var container = document.getElementById('reviewQuizList');
+  if (!r.success || !r.quizzes || r.quizzes.length === 0) {
+    container.innerHTML = '<div class="empty-block"><div class="eb-text">还没有测验题，点击"生成测验题"开始</div></div>';
+    return;
+  }
+  var h = '';
+  for (var i = 0; i < r.quizzes.length; i++) {
+    var q = r.quizzes[i];
+    var typeIcon = q.options ? '选择题' : '填空题';
+    var diffColor = q.difficulty === 'easy' ? 'var(--green)' : (q.difficulty === 'hard' ? 'var(--red)' : 'var(--accent)');
+    h += '<div class="lecture-card" style="margin-bottom:8px"><div class="lc-header"><span class="lc-title" style="font-size:var(--text-sm)">'+typeIcon+' · '+q.question.substring(0,50)+(q.question.length>50?'...':'')+'</span><span class="fi-remove" style="cursor:pointer" onclick="deleteQuiz('+q.id+')">删除</span></div><div style="font-size:var(--text-xs);color:'+diffColor+'">'+q.difficulty+' · '+q.created_at+'</div></div>';
+  }
+  container.innerHTML = h;
+}
+
+async function generateQuizzes() {
+  var cid = document.getElementById('reviewCourseSelect').value;
+  if (!cid) { alert('请先选择课程'); return; }
+  var st = document.getElementById('reviewStatus');
+  st.textContent = '正在生成测验题...'; st.className = 'status-msg';
+  var r = await eel.api_generate_quizzes(parseInt(cid))();
+  if (r.success) {
+    st.textContent = '生成了 ' + r.count + ' 道测验题'; st.className = 'status-msg ok';
+    await refreshReviewStats();
+    await loadQuizList();
+  } else {
+    st.textContent = r.error; st.className = 'status-msg fail';
+  }
+}
+
+async function startReview() {
+  var cid = document.getElementById('reviewCourseSelect').value || null;
+  var st = document.getElementById('reviewStatus');
+  var r = await eel.api_get_due_reviews(cid)();
+  if (!r.success || !r.reviews || r.reviews.length === 0) {
+    st.textContent = '今日没有需要复习的题目';
+    st.className = 'status-msg';
+    document.getElementById('reviewQuizArea').innerHTML = '';
+    return;
+  }
+  _reviewQueue = r.reviews;
+  _reviewIndex = 0;
+  _reviewAnswers = {};
+  st.textContent = '';
+  renderReviewQuestion();
+}
+
+function renderReviewQuestion() {
+  if (_reviewIndex >= _reviewQueue.length) { renderReviewSummary(); return; }
+  var q = _reviewQueue[_reviewIndex];
+  var area = document.getElementById('reviewQuizArea');
+  var html = '<div class="panel">';
+  html += '<div style="display:flex;justify-content:space-between;margin-bottom:var(--space-4)">';
+  html += '<span style="font-size:var(--text-sm);color:var(--text-tertiary)">第 ' + (_reviewIndex+1) + ' / ' + _reviewQueue.length + ' 题</span>';
+  html += '<span style="font-size:var(--text-xs);color:var(--accent)">' + q.difficulty + '</span>';
+  html += '</div>';
+  html += '<div style="font-size:var(--text-base);font-weight:var(--weight-semibold);margin-bottom:var(--space-4);color:var(--text-primary)">' + q.question + '</div>';
+  
+  if (q.options) {
+    for (var i = 0; i < q.options.length; i++) {
+      var letter = String.fromCharCode(65 + i);
+      html += '<div class="lecture-card" style="margin-bottom:8px;cursor:pointer" onclick="selectAnswer(' + i + ')">';
+      html += '<div style="display:flex;gap:var(--space-2)">';
+      html += '<span style="font-weight:var(--weight-bold);color:var(--accent)">' + letter + '</span>';
+      html += '<span>' + q.options[i] + '</span>';
+      html += '</div></div>';
+    }
+  } else {
+    html += '<input type="text" id="fillBlankInput" placeholder="输入你的答案..." style="width:100%;height:40px;padding:0 var(--space-3);background:var(--bg-input);border:1px solid var(--border-default);border-radius:var(--radius-sm);font-size:var(--text-sm);color:var(--text-primary);outline:none;margin-bottom:var(--space-4)" onkeydown="if(event.keyCode===13)submitFillBlank()"/>';
+    html += '<button class="btn-secondary" onclick="submitFillBlank()" style="margin-top:var(--space-2)">提交答案</button>';
+  }
+  html += '<div id="reviewFeedback" style="margin-top:var(--space-4)"></div>';
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+function selectAnswer(optionIndex) {
+  var q = _reviewQueue[_reviewIndex];
+  var userAnswer = String.fromCharCode(65 + optionIndex);
+  var correct = (userAnswer === q.answer);
+  _reviewAnswers[_reviewIndex] = { user: userAnswer, correct: correct };
+  showFeedback(correct, q);
+}
+
+function submitFillBlank() {
+  var q = _reviewQueue[_reviewIndex];
+  var input = document.getElementById('fillBlankInput');
+  if (!input || !input.value.trim()) return;
+  var userAnswer = input.value.trim();
+  var correct = (userAnswer === q.answer || userAnswer.toLowerCase() === q.answer.toLowerCase());
+  _reviewAnswers[_reviewIndex] = { user: userAnswer, correct: correct };
+  showFeedback(correct, q);
+}
+
+function showFeedback(correct, q) {
+  var fb = document.getElementById('reviewFeedback');
+  var html = '<div style="padding:var(--space-4);border-radius:var(--radius-md);background:';
+  html += correct ? 'rgba(52,211,153,0.10)' : 'rgba(248,113,113,0.10)';
+  html += ';margin-top:var(--space-3)';
+  html += '<div style="font-weight:var(--weight-semibold);color:';
+  html += correct ? 'var(--green)' : 'var(--red)';
+  html += ';margin-bottom:var(--space-2)">' + (correct ? '✅ 正确' : '❌ 错误') + '</div>';
+  html += '<div style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-2)">正确答案: ' + q.answer + '</div>';
+  if (q.explanation) {
+    html += '<div style="font-size:var(--text-sm);color:var(--text-tertiary)">' + q.explanation + '</div>';
+  }
+  html += '<div style="margin-top:var(--space-4);font-size:var(--text-sm);color:var(--text-tertiary)">你对这道题的掌握程度?</div>';
+  html += '<div style="display:flex;gap:var(--space-2);margin-top:var(--space-2)">';
+  html += '<button class="btn-secondary" style="flex:1" onclick="rateQuality(0)">完全不会</button>';
+  html += '<button class="btn-secondary" style="flex:1" onclick="rateQuality(3)">有印象</button>';
+  html += '<button class="btn-secondary" style="flex:1" onclick="rateQuality(4)">想起来了</button>';
+  html += '<button class="btn-secondary" style="flex:1" onclick="rateQuality(5)">很简单</button>';
+  html += '</div></div>';
+  fb.innerHTML = html;
+}
+
+async function rateQuality(quality) {
+  var q = _reviewQueue[_reviewIndex];
+  await eel.api_submit_review(q.review_id, quality)();
+  _reviewIndex++;
+  renderReviewQuestion();
+  refreshReviewStats();
+}
+
+function renderReviewSummary() {
+  var correct = 0;
+  for (var k in _reviewAnswers) { if (_reviewAnswers[k].correct) correct++; }
+  var total = _reviewQueue.length;
+  var pct = Math.round(correct / total * 100);
+  var area = document.getElementById('reviewQuizArea');
+  var html = '<div class="panel" style="text-align:center">';
+  html += '<div style="font-size:48px;margin-bottom:var(--space-4)">' + (pct>=80?'🎉':(pct>=60?'👍':'💪')) + '</div>';
+  html += '<div style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--text-primary);margin-bottom:var(--space-2)">' + correct + ' / ' + total + ' 正确</div>';
+  html += '<div style="font-size:var(--text-sm);color:var(--text-tertiary)">正确率 ' + pct + '% · 下次复习时间已根据 SM-2 算法自动安排</div>';
+  html += '<button class="btn-secondary" style="margin-top:var(--space-5)" onclick="initReview()">返回</button>';
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+async function deleteQuiz(quizId) {
+  if (!confirm('确认删除这道测验题？')) return;
+  await eel.api_delete_quiz(quizId)();
+  await refreshReviewStats();
+  await loadQuizList();
 }
 
 // ── Settings ──

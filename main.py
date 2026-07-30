@@ -5,7 +5,7 @@ import os
 import time
 from openai import OpenAI
 from db import init_db
-from repos import course_repo, lecture_repo, document_repo, chat_repo, settings_repo
+from repos import course_repo, lecture_repo, document_repo, chat_repo, settings_repo, quiz_repo
 from services.rag_service import index_document, retrieve_context
 
 # ========== 语音识别模块 ==========
@@ -497,6 +497,85 @@ def api_get_chat_messages(session_id):
 @eel.expose
 def api_delete_chat_session(session_id):
     chat_repo.delete_session(session_id)
+    return {"success": True}
+
+
+# ========== Quiz & Review ==========
+
+@eel.expose
+def api_generate_quizzes(course_id, lecture_id=None):
+    """从课程内容生成测验题"""
+    from services.quiz_service import generate_quizzes
+    api_key = settings_repo.get('deepseek_key')
+    if not api_key:
+        return {"success": False, "error": "请先在设置页配置 DeepSeek API Key"}
+    lid = int(lecture_id) if lecture_id else None
+    return generate_quizzes(course_id, lid, api_key)
+
+
+@eel.expose
+def api_get_quizzes(course_id):
+    """获取某课程的测验题列表"""
+    quizzes = quiz_repo.get_quizzes_by_course(course_id)
+    import json
+    result = []
+    for q in quizzes:
+        options = json.loads(q['options']) if q['options'] else None
+        result.append({
+            "id": q['id'],
+            "question": q['question'],
+            "options": options,
+            "answer": q['answer'],
+            "explanation": q.get('explanation', ''),
+            "difficulty": q.get('difficulty', 'medium'),
+            "lecture_id": q.get('lecture_id'),
+            "created_at": q['created_at']
+        })
+    return {"success": True, "quizzes": result}
+
+
+@eel.expose
+def api_get_due_reviews(course_id=None):
+    """获取今日待复习的题目"""
+    cid = int(course_id) if course_id else None
+    import json
+    reviews = quiz_repo.get_due_reviews(cid)
+    result = []
+    for r in reviews:
+        options = json.loads(r['options']) if r['options'] else None
+        result.append({
+            "review_id": r['id'],
+            "quiz_id": r['quiz_id'],
+            "question": r['question'],
+            "options": options,
+            "answer": r['answer'],
+            "explanation": r.get('explanation', ''),
+            "difficulty": r.get('difficulty', 'medium')
+        })
+    return {"success": True, "reviews": result}
+
+
+@eel.expose
+def api_submit_review(review_id, quality):
+    """提交答题结果，更新 SM-2 复习计划"""
+    result = quiz_repo.update_review(int(review_id), int(quality))
+    if result:
+        return {"success": True, "review": result}
+    return {"success": False, "error": "复习记录不存在"}
+
+
+@eel.expose
+def api_get_review_stats(course_id=None):
+    """获取复习统计"""
+    cid = int(course_id) if course_id else None
+    stats = quiz_repo.get_review_stats(cid)
+    return {"success": True, "stats": stats}
+
+
+@eel.expose
+def api_delete_quiz(quiz_id):
+    """删除测验题"""
+    quiz_repo.delete_quiz(int(quiz_id))
     return {"success": True}
 
 
