@@ -344,12 +344,16 @@ body{display:flex;flex-direction:column;height:100vh}
     </select>
     <button class="btn-test" onclick="createTutorSession()" style="height:36px;white-space:nowrap">+ 新建</button>
   </div>
+  <div style="display:flex;gap:var(--space-4)">
+  <div id="tutorHistory" style="width:180px;flex-shrink:0;max-height:55vh;overflow-y:auto"></div>
+  <div style="flex:1">
   <div id="tutorMessages" style="margin-bottom:var(--space-4);max-height:55vh;overflow-y:auto;padding-right:4px">
     <div class="empty-state" id="tutorEmpty">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;opacity:0.2;margin-bottom:12px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
       <div class="es-title">开始提问</div>
       <div class="es-desc">新建对话后，向 AI 提问课程相关问题</div>
     </div>
+  </div>
   </div>
   <div style="display:flex;gap:var(--space-2)">
     <input type="text" id="tutorInput" placeholder="输入你的问题..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){sendTutorMessage();event.preventDefault()}" style="flex:1;height:40px;padding:0 var(--space-3);background:var(--bg-input);border:1px solid var(--border-default);border-radius:var(--radius-sm);font-size:var(--text-sm);color:var(--text-primary);outline:none"/>
@@ -492,12 +496,29 @@ async function selectDocumentFile() {
   document.getElementById('kbFileName').textContent = r.info.filename;
   document.getElementById('kbFileMeta').textContent = r.info.size_mb + ' MB · ' + r.info.format;
 }
+// Eel callback for background indexing progress
+function update_index_progress(docId, status, info) {
+  var st = document.getElementById('kbDocStatus');
+  if (!st) return;
+  if (status === 'indexing') {
+    st.textContent = '正在建立向量索引...'; st.className = 'status-msg';
+  } else if (status === 'done') {
+    st.textContent = '索引完成 (' + info + ' chunks)'; st.className = 'status-msg ok';
+    if (_kbCourseId) loadDocuments(_kbCourseId);
+  } else if (status === 'no_key') {
+    st.textContent = '已保存，但未配置 API Key，跳过索引'; st.className = 'status-msg';
+  } else if (status === 'error') {
+    st.textContent = '索引失败: ' + info; st.className = 'status-msg fail';
+  }
+}
+eel.expose(update_index_progress);
+
 async function uploadDocument() {
   if (!_kbFilePath || !_kbCourseId) return;
   var st = document.getElementById('kbDocStatus'); st.textContent = i18n.t('knowledge.parsing'); st.className = 'status-msg';
   var r = await eel.api_upload_document(_kbFilePath, _kbCourseId)();
   if (r.success) {
-    st.textContent = i18n.t('knowledge.uploadSuccess'); st.className = 'status-msg ok';
+    st.textContent = '已保存，正在后台建立索引...'; st.className = 'status-msg';
     _kbFilePath = null;
     document.getElementById('kbUploadZone').classList.remove('hidden');
     document.getElementById('kbFileInfo').classList.add('hidden');
@@ -515,22 +536,110 @@ async function loadDocuments(courseId) {
   for (var i = 0; i < r.documents.length; i++) {
     var d = r.documents[i];
     var icon = d.file_type === '.pdf' ? '📄' : (d.file_type === '.pptx' || d.file_type === '.ppt' ? '📊' : '📝');
-    h += '<div class="lecture-card"><div class="lc-header"><span class="lc-title">'+icon+' '+d.filename+'</span></div><div class="lc-meta">'+d.created_at+'</div></div>';
+    var chunks = d.chunk_count > 0 ? ' · '+d.chunk_count+' chunks' : '';
+    h += '<div class="lecture-card"><div class="lc-header"><span class="lc-title">'+icon+' '+d.filename+'</span><span class="fi-remove" style="cursor:pointer;color:var(--text-tertiary)" onclick="deleteDocument('+d.id+','+courseId+')">删除</span></div><div class="lc-meta">'+d.created_at+chunks+'</div></div>';
   }
   container.innerHTML = h;
+}
+async function deleteDocument(docId, courseId) {
+  if (!confirm('确认删除这个文档？')) return;
+  var r = await eel.api_delete_document(docId)();
+  if (r.success) loadDocuments(courseId);
+  else alert(r.error || '删除失败');
 }
 
 // ── AI Tutor ──
 var _tutorSessionId = null;
+var _tutorStreamBuffer = '';
+var _tutorStreamEl = null;
+var _tutorPendingSources = [];
+
+// Eel callbacks (Python -> JS)
+function start_tutor_stream(sources) {
+  _tutorStreamBuffer = '';
+  _tutorPendingSources = sources || [];
+  var msgs = document.getElementById('tutorMessages');
+  msgs.insertAdjacentHTML('beforeend', '<div class="tutor-msg assistant" id="_tutorStreaming"><div class="tutor-label">AI Tutor</div><div class="tutor-bubble assistant" id="_tutorStreamBubble"></div></div>');
+  _tutorStreamEl = document.getElementById('_tutorStreamBubble');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+eel.expose(start_tutor_stream);
+
+function update_tutor_stream(chunk) {
+  if (_tutorStreamEl) {
+    _tutorStreamBuffer += chunk;
+    _tutorStreamEl.innerHTML = _tutorStreamBuffer.replace(/\n/g,'<br>');
+    var msgs = document.getElementById('tutorMessages');
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+}
+eel.expose(update_tutor_stream);
+
+function end_tutor_stream() {
+  if (_tutorStreamEl) {
+    var sourcesHtml = '';
+    if (_tutorPendingSources.length > 0) {
+      sourcesHtml = '<div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.08);font-size:11px;color:var(--text-tertiary);display:flex;flex-wrap:wrap;gap:6px;align-items:center;"><span>📖 参考资料</span>';
+      for (var si = 0; si < _tutorPendingSources.length; si++) {
+        var src = _tutorPendingSources[si];
+        var tag = src.source || '文档';
+        if (src.page) tag += ' P.' + src.page;
+        sourcesHtml += '<span style="background:rgba(129,140,248,0.15);padding:2px 8px;border-radius:4px;">' + tag + '</span>';
+      }
+      sourcesHtml += '</div>';
+    }
+    _tutorStreamEl.insertAdjacentHTML('beforeend', sourcesHtml);
+    _tutorStreamEl = null;
+    _tutorStreamBuffer = '';
+    _tutorPendingSources = [];
+  }
+}
+eel.expose(end_tutor_stream);
+
 async function initTutor() {
   _tutorSessionId = null;
-  document.getElementById('tutorMessages').innerHTML = '<div class="empty-state" id="tutorEmpty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;opacity:0.2;margin-bottom:12px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><div class="es-title">开始提问</div><div class="es-desc">新建对话后，向 AI 提问课程相关问题</div></div>';
+  document.getElementById('tutorMessages').innerHTML = '<div class="empty-state" id="tutorEmpty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;opacity:0.2;margin-bottom:12px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><div class="es-title">开始提问</div><div class="es-desc">新建对话或选择历史会话</div></div>';
   document.getElementById('tutorInput').value = '';
   var r = await eel.api_list_courses()();
   var s = document.getElementById('tutorCourseSelect'); if (!s) return;
   var h = '<option value="">全部课程</option>';
   for (var i = 0; i < r.courses.length; i++) h += '<option value="'+r.courses[i].id+'">'+r.courses[i].name+'</option>';
   s.innerHTML = h;
+  // Load chat history
+  await loadTutorHistory();
+}
+async function loadTutorHistory() {
+  try {
+    var r = await eel.api_get_chat_sessions(null)();
+    var historyBar = document.getElementById('tutorHistory');
+    if (!historyBar) return;
+    if (!r.success || !r.sessions || r.sessions.length === 0) {
+      historyBar.innerHTML = '';
+      return;
+    }
+    var h = '';
+    for (var i = 0; i < r.sessions.length; i++) {
+      var s = r.sessions[i];
+      var title = s.title || ('会话 #' + s.id);
+      h += '<div class="lecture-card" style="padding:var(--space-2) var(--space-3);cursor:pointer;margin-bottom:4px" onclick="selectTutorSession('+s.id+')"><div style="font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--text-primary)">'+title+'</div><div style="font-size:var(--text-xs);color:var(--text-tertiary)">'+s.updated_at+'</div></div>';
+    }
+    historyBar.innerHTML = h;
+  } catch(e) {}
+}
+async function selectTutorSession(sessionId) {
+  _tutorSessionId = sessionId;
+  var r = await eel.api_get_chat_messages(sessionId)();
+  var msgs = document.getElementById('tutorMessages');
+  if (!r.success || !r.messages) { msgs.innerHTML = ''; return; }
+  var h = '';
+  for (var i = 0; i < r.messages.length; i++) {
+    var m = r.messages[i];
+    var label = m.role === 'user' ? '你' : 'AI Tutor';
+    var cls = m.role === 'user' ? 'user' : 'assistant';
+    h += '<div class="tutor-msg '+cls+'"><div class="tutor-label">'+label+'</div><div class="tutor-bubble '+cls+'">'+m.content.replace(/\n/g,'<br>')+'</div></div>';
+  }
+  msgs.innerHTML = h;
+  msgs.scrollTop = msgs.scrollHeight;
 }
 async function onTutorCourseChange() {
   var cid = document.getElementById('tutorCourseSelect').value;
@@ -560,22 +669,157 @@ async function sendTutorMessage() {
   var empty = document.getElementById('tutorEmpty'); if (empty) empty.remove();
   msgs.insertAdjacentHTML('beforeend', '<div class="tutor-msg user"><div class="tutor-label">你</div><div class="tutor-bubble user">'+msg+'</div></div>');
   input.value = ''; msgs.scrollTop = msgs.scrollHeight;
+  // Streaming happens via eel callbacks
   var r = await eel.api_tutor_chat(_tutorSessionId, msg)();
-  if (r.success) {
-    msgs.insertAdjacentHTML('beforeend', '<div class="tutor-msg assistant"><div class="tutor-label">AI Tutor</div><div class="tutor-bubble assistant">'+r.reply.replace(/\n/g,'<br>')+'</div></div>');
-    msgs.scrollTop = msgs.scrollHeight;
-  } else {
+  if (!r.success) {
     msgs.insertAdjacentHTML('beforeend', '<div class="tutor-msg assistant"><div class="tutor-label">AI Tutor</div><div class="tutor-bubble assistant" style="color:var(--red)">❌ '+r.error+'</div></div>');
+    msgs.scrollTop = msgs.scrollHeight;
   }
+  // Refresh history after each message
+  await loadTutorHistory();
 }
 
 // ── Upload ──
 var _selectedFilePath = null;
-async function initUpload() { _selectedFilePath = null; document.getElementById('uploadZone').classList.remove('hidden'); document.getElementById('fileInfo').classList.add('hidden'); var btn = document.getElementById('startBtn'); if (btn) { btn.disabled = true; btn.textContent = i18n.t('upload.btnStartDisabled'); } var ps = document.getElementById('progressSection'); if (ps) { ps.classList.add('hidden'); var nb = ps.querySelector('.note-box'); if (nb) nb.remove(); } var r = await eel.api_list_courses()(); var s = document.getElementById('courseSelect'); if (!s) return; if (r.courses.length === 0) { s.innerHTML = '<option value="">'+i18n.t('upload.selectNoCourses')+'</option>'; return; } var h = '<option value="">'+i18n.t('upload.selectPlaceholder')+'</option>'; for (var i = 0; i < r.courses.length; i++) h += '<option value="'+r.courses[i].id+'">'+r.courses[i].name+'</option>'; s.innerHTML = h; s.onchange = checkUploadReady; }
+async function initUpload() {
+  _selectedFilePath = null;
+  document.getElementById('uploadZone').classList.remove('hidden');
+  document.getElementById('fileInfo').classList.add('hidden');
+  var btn = document.getElementById('startBtn');
+  if (btn) { btn.disabled = true; btn.textContent = i18n.t('upload.btnStartDisabled'); }
+  var ps = document.getElementById('progressSection');
+  if (ps) { ps.classList.add('hidden'); var nb = ps.querySelector('.note-box'); if (nb) nb.remove(); }
+  var r = await eel.api_list_courses()();
+  var s = document.getElementById('courseSelect'); if (!s) return;
+  if (r.courses.length === 0) { s.innerHTML = '<option value="">'+i18n.t('upload.selectNoCourses')+'</option>'; return; }
+  var h = '<option value="">'+i18n.t('upload.selectPlaceholder')+'</option>';
+  for (var i = 0; i < r.courses.length; i++) h += '<option value="'+r.courses[i].id+'">'+r.courses[i].name+'</option>';
+  s.innerHTML = h;
+  s.onchange = checkUploadReady;
+  // Check for ongoing background task
+  try {
+    var task = await eel.api_get_task_status()();
+    if (task && task.status === 'running') {
+      if (ps) ps.classList.remove('hidden');
+      var ts = document.getElementById('stepTranscribe');
+      if (ts) ts.innerHTML = '<span class="ps-icon ps-active">&bull;</span> <span>'+i18n.t('upload.progress.transcribingActive')+'</span>';
+      var fill = document.getElementById('progressFill');
+      if (fill) fill.style.width = '30%';
+      if (btn) { btn.disabled = true; btn.textContent = i18n.t('upload.btnProcessing'); }
+    } else if (task && task.status === 'done') {
+      // Task completed while away — show result
+      if (ps) ps.classList.remove('hidden');
+      var ts2 = document.getElementById('stepTranscribe');
+      if (ts2) ts2.innerHTML = '<span class="ps-icon ps-done">&bull;</span> <span>'+i18n.t('upload.progress.transcribingDone')+'</span>';
+      var ns2 = document.getElementById('stepNote');
+      if (ns2) ns2.innerHTML = '<span class="ps-icon ps-done">&bull;</span> <span>'+i18n.t('upload.progress.generatingDone')+'</span>';
+      var fill2 = document.getElementById('progressFill');
+      if (fill2) fill2.style.width = '100%';
+      if (btn) btn.textContent = i18n.t('upload.btnDone');
+      var lid = task.lecture_id;
+      ps.insertAdjacentHTML('beforeend', '<div class="note-box"><h3>'+i18n.t('upload.noteBoxTitle')+'</h3><div style="color:var(--green);margin-bottom:8px">✅ 转录完成（笔记未生成，请重新上传生成）</div><button class="btn-secondary" style="margin-top:12px" onclick="navigateTo(\'note\',{lectureId:'+lid+'})">查看转录</button></div>');
+      await eel.api_clear_task_status()();
+    } else if (task && task.status === 'error') {
+      if (ps) ps.classList.remove('hidden');
+      var ts3 = document.getElementById('stepTranscribe');
+      if (ts3) ts3.innerHTML = '<span class="ps-icon" style="color:var(--red)">&bull;</span> '+i18n.t('upload.progress.transcribingFailed')+'：'+task.error;
+      if (btn) { btn.textContent = i18n.t('upload.btnFailed'); btn.disabled = false; }
+      await eel.api_clear_task_status()();
+    }
+  } catch(e) {}
+}
 function checkUploadReady() { var cid = document.getElementById('courseSelect') ? document.getElementById('courseSelect').value : ''; var btn = document.getElementById('startBtn'); if (!btn) return; if (cid && _selectedFilePath) { btn.disabled = false; btn.textContent = i18n.t('upload.btnStart'); } else { btn.disabled = true; btn.textContent = i18n.t('upload.btnStartDisabled'); } }
 async function selectAudioFile() { var r = await eel.api_select_audio_file()(); if (!r.success) return; _selectedFilePath = r.path; document.getElementById('uploadZone').classList.add('hidden'); document.getElementById('fileInfo').classList.remove('hidden'); document.getElementById('fileName').textContent = r.info.filename; document.getElementById('fileMeta').textContent = r.info.size_mb + ' MB · ' + r.info.format; checkUploadReady(); }
 function removeFile() { _selectedFilePath = null; document.getElementById('uploadZone').classList.remove('hidden'); document.getElementById('fileInfo').classList.add('hidden'); checkUploadReady(); }
-async function startProcess() { var cid = parseInt(document.getElementById('courseSelect').value); if (!cid || !_selectedFilePath) return; var btn = document.getElementById('startBtn'); if (btn) { btn.disabled = true; btn.textContent = i18n.t('upload.btnProcessing'); } var ps = document.getElementById('progressSection'); if (ps) ps.classList.remove('hidden'); var copyResult = await eel.api_copy_audio(_selectedFilePath, cid)(); var ts = document.getElementById('stepTranscribe'); if (ts) ts.innerHTML = '<span class="ps-icon ps-active">&bull;</span> <span>'+i18n.t('upload.progress.transcribingActive')+'</span>'; var fill = document.getElementById('progressFill'); if (fill) fill.style.width = '30%'; var tr = await eel.api_transcribe_audio(copyResult.path, cid)(); if (!tr.success) { if (ts) ts.innerHTML = '<span class="ps-icon" style="color:var(--red)">&bull;</span> '+i18n.t('upload.progress.transcribingFailed')+'：'+tr.error; if (btn) { btn.textContent = i18n.t('upload.btnFailed'); btn.disabled = false; } return; } if (ts) ts.innerHTML = '<span class="ps-icon ps-done">&bull;</span> <span>'+i18n.t('upload.progress.transcribingDone')+'</span>'; if (fill) fill.style.width = '65%'; var lid = tr.lecture_id; var ns = document.getElementById('stepNote'); if (ns) ns.innerHTML = '<span class="ps-icon ps-active">&bull;</span> <span>'+i18n.t('upload.progress.generatingActive')+'</span>'; var nr = await eel.api_generate_note(lid)(); if (!nr.success) { if (ns) ns.innerHTML = '<span class="ps-icon" style="color:var(--red)">&bull;</span> '+i18n.t('upload.progress.generatingFailed')+'：'+nr.error; if (btn) { btn.textContent = i18n.t('upload.btnFailed'); btn.disabled = false; } return; } if (ns) ns.innerHTML = '<span class="ps-icon ps-done">&bull;</span> <span>'+i18n.t('upload.progress.generatingDone')+'</span>'; if (fill) fill.style.width = '100%'; if (btn) btn.textContent = i18n.t('upload.btnDone'); if (ps) { var ob = ps.querySelector('.note-box'); if (ob) ob.remove(); ps.insertAdjacentHTML('beforeend', '<div class="note-box"><h3>'+i18n.t('upload.noteBoxTitle')+'</h3><div>'+nr.note.replace(/\n/g,'<br>')+'</div><button class="btn-secondary" style="margin-top:12px" onclick="navigateTo(\'note\',{lectureId:'+lid+'})">'+i18n.t('upload.viewFullNote')+'</button></div>'); } _selectedFilePath = null; document.getElementById('uploadZone').classList.remove('hidden'); document.getElementById('fileInfo').classList.add('hidden'); if (btn) { btn.disabled = true; btn.textContent = i18n.t('upload.btnStartDisabled'); } }
+// Eel callback for note streaming
+var _noteStreamBuffer = '';
+var _noteStreamEl = null;
+function start_note_stream() {
+  _noteStreamBuffer = '';
+  var ps = document.getElementById('progressSection');
+  if (ps) { var ob = ps.querySelector('.note-box'); if (ob) ob.remove(); }
+  ps.insertAdjacentHTML('beforeend', '<div class="note-box"><h3>'+i18n.t('upload.noteBoxTitle')+'</h3><div id="_noteStreamContent"></div></div>');
+  _noteStreamEl = document.getElementById('_noteStreamContent');
+}
+eel.expose(start_note_stream);
+function update_note_stream(chunk) {
+  if (_noteStreamEl) {
+    _noteStreamBuffer += chunk;
+    _noteStreamEl.innerHTML = _noteStreamBuffer.replace(/\n/g,'<br>');
+  }
+}
+eel.expose(update_note_stream);
+function end_note_stream() {
+  if (_noteStreamEl) {
+    var lid = _noteStreamEl.getAttribute('data-lid');
+    if (lid) {
+      _noteStreamEl.insertAdjacentHTML('beforeend', '<button class="btn-secondary" style="margin-top:12px" onclick="navigateTo(\'note\',{lectureId:'+lid+'})">'+i18n.t('upload.viewFullNote')+'</button>');
+    }
+    _noteStreamEl = null;
+    _noteStreamBuffer = '';
+  }
+}
+eel.expose(end_note_stream);
+
+// Polling for background transcription progress
+async function pollTranscribeStatus() {
+  return new Promise(function(resolve) {
+    var timer = setInterval(async function() {
+      try {
+        var task = await eel.api_get_task_status()();
+        if (!task) { clearInterval(timer); resolve(null); return; }
+        if (task.status === 'done') {
+          clearInterval(timer);
+          await eel.api_clear_task_status()();
+          resolve({lecture_id: task.lecture_id, transcript: task.transcript});
+        } else if (task.status === 'error') {
+          clearInterval(timer);
+          await eel.api_clear_task_status()();
+          resolve(null);
+          var ts = document.getElementById('stepTranscribe');
+          var btn = document.getElementById('startBtn');
+          if (ts) ts.innerHTML = '<span class="ps-icon" style="color:var(--red)">&bull;</span> '+i18n.t('upload.progress.transcribingFailed')+'：'+task.error;
+          if (btn) { btn.textContent = i18n.t('upload.btnFailed'); btn.disabled = false; }
+        }
+      } catch(e) {}
+    }, 2000);
+  });
+}
+
+async function startProcess() {
+  var cid = parseInt(document.getElementById('courseSelect').value);
+  if (!cid || !_selectedFilePath) return;
+  var btn = document.getElementById('startBtn');
+  if (btn) { btn.disabled = true; btn.textContent = i18n.t('upload.btnProcessing'); }
+  var ps = document.getElementById('progressSection');
+  if (ps) ps.classList.remove('hidden');
+  var copyResult = await eel.api_copy_audio(_selectedFilePath, cid)();
+  var ts = document.getElementById('stepTranscribe');
+  if (ts) ts.innerHTML = '<span class="ps-icon ps-active">&bull;</span> <span>'+i18n.t('upload.progress.transcribingActive')+'</span>';
+  var fill = document.getElementById('progressFill');
+  if (fill) fill.style.width = '30%';
+  // Start background transcription
+  await eel.api_transcribe_audio(copyResult.path, cid)();
+  // Poll for result
+  var tr = await pollTranscribeStatus();
+  if (!tr) return;
+  var lid = tr.lecture_id;
+  var ns = document.getElementById('stepNote');
+  if (ns) ns.innerHTML = '<span class="ps-icon ps-active">&bull;</span> <span>'+i18n.t('upload.progress.generatingActive')+'</span>';
+  // Set lid on stream element for the "view full note" button
+  var streamEl = document.getElementById('_noteStreamContent');
+  if (streamEl) streamEl.setAttribute('data-lid', lid);
+  // Streaming happens via eel callbacks during api_generate_note
+  var nr = await eel.api_generate_note(lid)();
+  if (!nr.success) { if (ns) ns.innerHTML = '<span class="ps-icon" style="color:var(--red)">&bull;</span> '+i18n.t('upload.progress.generatingFailed')+'：'+nr.error; if (btn) { btn.textContent = i18n.t('upload.btnFailed'); btn.disabled = false; } return; }
+  if (ns) ns.innerHTML = '<span class="ps-icon ps-done">&bull;</span> <span>'+i18n.t('upload.progress.generatingDone')+'</span>';
+  if (fill) fill.style.width = '100%';
+  if (btn) btn.textContent = i18n.t('upload.btnDone');
+  _selectedFilePath = null;
+  document.getElementById('uploadZone').classList.remove('hidden');
+  document.getElementById('fileInfo').classList.add('hidden');
+  if (btn) { btn.disabled = true; btn.textContent = i18n.t('upload.btnStartDisabled'); }
+}
 
 // ── Settings ──
 async function initSettings() { var k = await eel.api_get_setting('deepseek_key')(); var el = document.getElementById('deepseekKey'); if (el && k) el.value = k; var ls = document.getElementById('languageSelect'); if (ls) ls.value = i18n.getLanguage(); }

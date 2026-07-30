@@ -1,13 +1,14 @@
 import os
+import logging
 from openai import OpenAI
 from services.rag_service import retrieve_with_metadata
 from repos import chat_repo, document_repo
 
+logger = logging.getLogger(__name__)
+
 
 def _detect_intent(message, api_key):
-    """用 LLM 判断用户问题的意图类型。
-    返回: concept_explain | equation_help | exam_question | summarize | general
-    """
+    """用 LLM 判断用户问题的意图类型。"""
     client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
     response = client.chat.completions.create(
         model="deepseek-v4-flash",
@@ -48,7 +49,7 @@ def _load_prompt(intent):
     filepath = os.path.join(prompt_dir, filename)
 
     if not os.path.exists(filepath):
-        return "你是一位大学课程助教。请根据提供的课程资料回答学生问题。如果资料不足以回答,请明确说明,不要编造。使用中文回答。"
+        return "你是一位大学课程助教。请根据提供的课程资料回答学生问题。如果资料不足以回答,请明确说明,不要编造。使用中文回答,专业术语请提供中英文对照。"
 
     with open(filepath, 'r', encoding='utf-8') as f:
         return f.read()
@@ -66,23 +67,24 @@ def _retrieve(course_id, lecture_id, message, api_key):
         doc_ids = document_repo.get_ids_with_chunks(course_id)
 
     if not doc_ids:
+        logger.warning(f"未找到已索引的文档: course_id={course_id}")
         return "", []
 
     try:
         result = retrieve_with_metadata(doc_ids, message, api_key, top_k=5)
-        # 提取简洁的来源信息（页码 + 文件名）
         sources = [
             {"page": s.get("page"), "source": s.get("source")}
             for s in result["sources"]
         ]
+        logger.info(f"RAG 检索成功: {len(result['sources'])} 条结果")
         return result["context"], sources
-    except Exception:
+    except Exception as e:
+        logger.warning(f"RAG 检索失败: {e}", exc_info=True)
         return "", []
 
 
-def _generate(intent, history, rag_context, message, api_key):
-    """调用 LLM 生成回答"""
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+def _build_messages(intent, history, rag_context, message):
+    """组装对话消息列表"""
     system_prompt = _load_prompt(intent)
 
     if rag_context:
@@ -92,6 +94,13 @@ def _generate(intent, history, rag_context, message, api_key):
     for h in history:
         messages.append({"role": h['role'], "content": h['content']})
     messages.append({"role": "user", "content": message})
+    return messages
+
+
+def _generate(intent, history, rag_context, message, api_key):
+    """非流式生成"""
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+    messages = _build_messages(intent, history, rag_context, message)
 
     response = client.chat.completions.create(
         model="deepseek-v4-flash",
@@ -102,15 +111,40 @@ def _generate(intent, history, rag_context, message, api_key):
     return response.choices[0].message.content
 
 
+def _generate_stream(intent, history, rag_context, message, api_key):
+    """流式生成，yield 每个 chunk"""
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+    messages = _build_messages(intent, history, rag_context, message)
+
+    response = client.chat.completions.create(
+        model="deepseek-v4-flash",
+        messages=messages,
+        temperature=0.7,
+        max_tokens=2000,
+        stream=True
+    )
+
+    for chunk in response:
+        if chunk.choices and chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
+
+
 def tutor_chat(session_id, course_id, lecture_id, message, api_key):
-    """AI Tutor 核心函数:接收用户消息,返回 AI 回复。"""
+    """非流式版"""
     intent = _detect_intent(message, api_key)
     history = _load_history(session_id)
     rag_context, sources = _retrieve(course_id, lecture_id, message, api_key)
     reply = _generate(intent, history, rag_context, message, api_key)
 
-    return {
-        "reply": reply,
-        "sources": sources,
-        "intent": intent
-    }
+    return {"reply": reply, "sources": sources, "intent": intent}
+
+
+def tutor_chat_stream(session_id, course_id, lecture_id, message, api_key):
+    """流式版：返回 sources + 生成器"""
+    intent = _detect_intent(message, api_key)
+    history = _load_history(session_id)
+    rag_context, sources = _retrieve(course_id, lecture_id, message, api_key)
+
+    stream = _generate_stream(intent, history, rag_context, message, api_key)
+
+    return {"sources": sources, "intent": intent, "stream": stream}

@@ -48,6 +48,12 @@ def get_ids_with_chunks(course_id):
     return [row['id'] for row in rows]
 
 
+def delete(doc_id):
+    """删除文档记录"""
+    execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+    return True
+
+
 def delete_by_course(course_id):
     """删除某课程下所有文档（级联删除用）"""
     execute("DELETE FROM documents WHERE course_id = ?", (course_id,))
