@@ -304,6 +304,15 @@ body{display:flex;flex-direction:column;height:100vh}
       <option value="zh">简体中文</option>
     </select>
   </div>
+  <div class="settings-card">
+    <div class="sc-title">Speech-to-Text (Groq)</div>
+    <div class="settings-field-label">Groq API Key</div>
+    <div class="input-row">
+      <input type="password" id="groqKey" placeholder="gsk_..."/>
+      <button class="btn-test" onclick="testGroq()">测试</button>
+    </div>
+    <div class="status-msg" id="groqStatus"></div>
+  </div>
   <button class="btn-save" onclick="saveSettings()" data-i18n="settings.save">保存设置</button>
   <div class="status-msg" id="saveStatus" style="margin-top:var(--space-2)"></div>
 </div></template>
@@ -822,9 +831,10 @@ async function startProcess() {
 }
 
 // ── Settings ──
-async function initSettings() { var k = await eel.api_get_setting('deepseek_key')(); var el = document.getElementById('deepseekKey'); if (el && k) el.value = k; var ls = document.getElementById('languageSelect'); if (ls) ls.value = i18n.getLanguage(); }
+async function initSettings() { var k = await eel.api_get_setting('deepseek_key')(); var el = document.getElementById('deepseekKey'); if (el && k) el.value = k; var gk = await eel.api_get_setting('groq_key')(); var gel = document.getElementById('groqKey'); if (gel && gk) gel.value = gk; var ls = document.getElementById('languageSelect'); if (ls) ls.value = i18n.getLanguage(); }
 async function testDeepseek() { var k = document.getElementById('deepseekKey') ? document.getElementById('deepseekKey').value.trim() : ''; if (!k) return; var el = document.getElementById('deepseekStatus'); if (!el) return; el.textContent = i18n.t('settings.testing'); el.className = 'status-msg'; var r = await eel.api_test_key('deepseek', k)(); if (r.success) { el.textContent = i18n.t('settings.testSuccess'); el.className = 'status-msg ok'; } else { el.textContent = i18n.t('settings.testFailed'); el.className = 'status-msg fail'; } }
-async function saveSettings() { var k = document.getElementById('deepseekKey') ? document.getElementById('deepseekKey').value.trim() : ''; if (k) await eel.api_save_setting('deepseek_key', k)(); var el = document.getElementById('saveStatus'); if (el) { el.textContent = i18n.t('settings.saved'); el.className = 'status-msg ok'; } var btn = document.querySelector('.btn-save'); if (btn) { var o = btn.textContent; btn.textContent = i18n.t('settings.saved'); btn.style.background = 'var(--green)'; setTimeout(function(){ btn.textContent = o; btn.style.background = ''; }, 1500); } }
+async function testGroq() { var k = document.getElementById('groqKey') ? document.getElementById('groqKey').value.trim() : ''; if (!k) return; var el = document.getElementById('groqStatus'); if (!el) return; el.textContent = '测试中...'; el.className = 'status-msg'; var r = await eel.api_test_key('groq', k)(); if (r.success) { el.textContent = '连接成功'; el.className = 'status-msg ok'; } else { el.textContent = '连接失败'; el.className = 'status-msg fail'; } }
+async function saveSettings() { var k = document.getElementById('deepseekKey') ? document.getElementById('deepseekKey').value.trim() : ''; if (k) await eel.api_save_setting('deepseek_key', k)(); var gk = document.getElementById('groqKey') ? document.getElementById('groqKey').value.trim() : ''; if (gk) await eel.api_save_setting('groq_key', gk)(); var el = document.getElementById('saveStatus'); if (el) { el.textContent = i18n.t('settings.saved'); el.className = 'status-msg ok'; } var btn = document.querySelector('.btn-save'); if (btn) { var o = btn.textContent; btn.textContent = i18n.t('settings.saved'); btn.style.background = 'var(--green)'; setTimeout(function(){ btn.textContent = o; btn.style.background = ''; }, 1500); } }
 
 // ── Boot ──
 (async function boot() { await i18n.init(); navigateTo('dashboard'); })();

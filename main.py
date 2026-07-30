@@ -10,22 +10,27 @@ from services.rag_service import index_document, retrieve_context
 
 # ========== 语音识别模块 ==========
 
-_whisper_model = None
-
-def _get_whisper_model():
-    global _whisper_model
-    if _whisper_model is None:
-        from faster_whisper import WhisperModel
-        _whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
-    return _whisper_model
-
 def transcribe(audio_path):
-    model = _get_whisper_model()
-    segments, _ = model.transcribe(audio_path, language="zh", vad_filter=True, beam_size=5)
-    text = "".join([s.text for s in segments])
-    if not text.strip():
+    """使用 Groq Whisper API 转录音频"""
+    from repos import settings_repo
+    groq_key = settings_repo.get('groq_key')
+    if not groq_key:
+        raise Exception("请先在设置页配置 Groq API Key（用于语音转录）")
+
+    from groq import Groq
+    client = Groq(api_key=groq_key)
+
+    with open(audio_path, "rb") as f:
+        response = client.audio.transcriptions.create(
+            model="whisper-large-v3",
+            file=f,
+            language="zh",
+            response_format="text"
+        )
+
+    if not response or not response.strip():
         raise Exception("转录结果为空,请检查音频文件是否包含有效语音")
-    return text
+    return response
 
 # ========== 笔记生成模块 ==========
 
@@ -402,10 +407,16 @@ def api_save_setting(key, value):
 @eel.expose
 def api_test_key(which, key):
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=key, base_url="https://api.deepseek.com/v1")
-        client.models.list()
-        return {"success": True}
+        if which == 'groq':
+            from groq import Groq
+            client = Groq(api_key=key)
+            client.models.list()
+            return {"success": True}
+        else:
+            from openai import OpenAI
+            client = OpenAI(api_key=key, base_url="https://api.deepseek.com/v1")
+            client.models.list()
+            return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
