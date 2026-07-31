@@ -1,17 +1,17 @@
 # Monad — AI Study Assistant
 
-An AI-powered learning assistant for university students. Upload lecture recordings and course materials to auto-generate structured notes, ask AI questions, and review with spaced repetition.
+An AI-powered learning assistant for university students. Upload lecture recordings and course materials to auto-generate structured notes, ask AI questions with RAG-enhanced retrieval, and review with spaced repetition.
 
 ## ✨ Core Features
-- 🎤 **Lecture Analysis** — Upload classroom recordings to auto-transcribe and generate structured notes
+
+- 🎤 **Lecture Analysis** — Upload classroom recordings → speech-to-text → AI-generated structured notes
 - 📚 **Course Management** — Organize lecture notes by course, review historical notes anytime
 - 📝 **Structured Notes** — Summary / Key Concepts / Equations / Exam Focus / Terminology
-- 🤖 **AI-Powered** — DeepSeek API for note generation, Groq Whisper API for transcription
-- 📖 **Knowledge Base** — Upload PDF/PPT/TXT course materials with RAG-enhanced retrieval
-- 🧠 **AI Tutor** — Ask questions with streaming responses, powered by two-stage RAG
+- 📖 **Knowledge Base** — Upload PDF/PPT/TXT with two-stage RAG retrieval (vector recall + cross-encoder reranking)
+- 🧠 **AI Tutor** — Streaming responses with source citations (page numbers)
 - 🔄 **Spaced Repetition** — SM-2 algorithm schedules review sessions based on student performance
 - 🌍 **Bilingual** — UI supports English / Simplified Chinese
-- 🌙 **Dark Mode** — Indigo and Zinc color scheme
+- 🌙 **Dark Mode** — Indigo + Zinc color scheme
 
 ## 🚀 Quick Start
 
@@ -31,37 +31,37 @@ An AI-powered learning assistant for university students. Upload lecture recordi
 
 ### API Key Configuration
 
-Open the app and go to **Settings** to configure two API keys:
+Open the app → go to **Settings**, configure two API keys:
 
 1. **DeepSeek API Key** (for AI Q&A and note generation)
    - Register at https://platform.deepseek.com/
-   - Enter key, click Test, see green Connected, then Save
+   - Enter key → click "Test" → green "Connected" → "Save"
 
 2. **Groq API Key** (for speech-to-text)
    - Register at https://console.groq.com/
-   - Enter key, click Test, see green Connected, then Save
+   - Enter key → click "Test" → green "Connected" → "Save"
 
 ### Usage
 
 **Translate Documents:**
-1. Courses - Create a course
-2. Knowledge Base - Select course - Upload PDF/PPT/TXT
-3. AI Tutor - New session - Type your translation request
+1. Courses → Create a course
+2. Knowledge Base → Select course → Upload PDF/PPT/TXT
+3. AI Tutor → New session → Type "Please translate the full text"
 
-**Lecture Recording to Notes:**
-1. Lecture Analysis - Select course - Choose audio - Start
-2. Auto-transcription - Auto-generate structured notes
+**Lecture Recording → Notes:**
+1. Lecture Analysis → Select course → Choose audio → Start
+2. Auto-transcription → Auto-generate structured notes
 
 **AI Q&A:**
-1. AI Tutor - New session - Ask any question
+1. AI Tutor → New session → Ask any question
 2. AI responds based on uploaded course materials with source citations
 
-**Review and Quiz:**
-1. Review - Select course - Generate Quizzes
-2. Start Review - Answer questions - Rate mastery level
+**Review & Quiz:**
+1. Review → Select course → Generate Quizzes
+2. Start Review → Answer questions → Rate mastery level
 3. SM-2 algorithm schedules next review automatically
 
-## Project Structure
+## 📁 Project Structure
 
     monad/
     ├── README.md
@@ -80,31 +80,47 @@ Open the app and go to **Settings** to configure two API keys:
         ├── db.py
         ├── eval_rag.py
         ├── repos/
+        │   ├── course_repo.py
+        │   ├── lecture_repo.py
+        │   ├── document_repo.py
+        │   ├── chat_repo.py
+        │   ├── settings_repo.py
+        │   └── quiz_repo.py
         ├── services/
+        │   ├── tutor_service.py
+        │   ├── quiz_service.py
+        │   ├── rag_service.py
+        │   └── document_service.py
         ├── utils/
+        │   └── file_utils.py
         ├── web/
+        │   ├── index.html
+        │   ├── css/
+        │   └── js/
         └── prompts/
+            ├── note_prompt.txt
+            └── tutor_prompts/
 
-## Architecture
+## 🏗️ Architecture
 
     Frontend (Eel + HTML/CSS/JS)
             | @eel.expose (RPC)
     main.py (API Layer)
             |
     +-------+-------+
-    |   Services    |  repos/       |  rag_service.py
-    | tutor_service |  course_repo  |  chunk_document
-    | quiz_service  |  lecture_repo |  retrieve + rerank
-    | doc_service   |  document_repo|  index_document
-    +---------------+  chat_repo    |  
-                       quiz_repo    |
-                       settings_repo|
-                    +------+--------+ +------+------+
-                db.py (SQLite)      ChromaDB (Vector DB)
+    |   Services    |  repos/        |  rag_service.py
+    | tutor_service |  course_repo   |  chunk_document
+    | quiz_service  |  lecture_repo  |  retrieve + rerank
+    | doc_service   |  document_repo |  index_document
+    +---------------+  chat_repo     |
+                       quiz_repo     |
+                       settings_repo |
+                    +------+---------+ +------+------+
+                db.py (SQLite)        ChromaDB (Vector DB)
 
-**Dependency direction (always downward):** main.py - services - repos - db.py
+**Dependency direction (always downward):** main.py → services → repos → db.py
 
-## RAG Pipeline (Two-Stage Retrieval)
+## 🧠 RAG Pipeline (Two-Stage Retrieval)
 
     User Query
        |
@@ -120,7 +136,7 @@ Open the app and go to **Settings** to configure two API keys:
        v
     Output: context + sources [{page, source, score}]
 
-## SM-2 Spaced Repetition
+## 🔄 SM-2 Spaced Repetition
 
 | Action | ease_factor | interval | repetitions | next_review |
 |--------|-------------|----------|-------------|-------------|
@@ -129,7 +145,8 @@ Open the app and go to **Settings** to configure two API keys:
 | Correct again (quality=5) | 2.7 | 6 | 2 | +6 days |
 | Incorrect (quality=1) | 2.5 | 1 | 0 | +1 day (reset) |
 
-## Tech Stack
+## 🛠️ Tech Stack
+
 - **Framework**: Eel (desktop web framework)
 - **Language**: Python 3.10+
 - **Database**: SQLite (data) + ChromaDB (vectors)
@@ -139,5 +156,6 @@ Open the app and go to **Settings** to configure two API keys:
 - **Reranker**: BAAI/bge-reranker-base (local)
 - **Spaced Repetition**: SM-2 algorithm
 
-## License
+## 📄 License
+
 MIT
