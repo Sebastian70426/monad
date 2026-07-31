@@ -1,54 +1,143 @@
-# Monad — AI 学习助手
+# Monad — AI Study Assistant
 
-基于 AI 的文档翻译与学习助手，支持课堂录音转录、智能笔记生成、文档问答。
+An AI-powered learning assistant for university students. Upload lecture recordings and course materials to auto-generate structured notes, ask AI questions, and review with spaced repetition.
 
-## 快速开始
+## ✨ Core Features
+- 🎤 **Lecture Analysis** — Upload classroom recordings to auto-transcribe and generate structured notes
+- 📚 **Course Management** — Organize lecture notes by course, review historical notes anytime
+- 📝 **Structured Notes** — Summary / Key Concepts / Equations / Exam Focus / Terminology
+- 🤖 **AI-Powered** — DeepSeek API for note generation, Groq Whisper API for transcription
+- 📖 **Knowledge Base** — Upload PDF/PPT/TXT course materials with RAG-enhanced retrieval
+- 🧠 **AI Tutor** — Ask questions with streaming responses, powered by two-stage RAG
+- 🔄 **Spaced Repetition** — SM-2 algorithm schedules review sessions based on student performance
+- 🌍 **Bilingual** — UI supports English / Simplified Chinese
+- 🌙 **Dark Mode** — Indigo and Zinc color scheme
 
-### 环境要求
+## 🚀 Quick Start
+
+### Prerequisites
 - Python 3.10+
 - macOS / Windows / Linux
 
-### 安装步骤
+### Installation
 
-1. 下载项目 ZIP 并解压
-2. 安装 Python 3.10+（https://www.python.org/downloads/）
-   - Windows 安装时勾选 "Add Python to PATH"
-3. 双击启动：
-   - **Mac**：双击 `start.command`
-   - **Windows**：双击 `start.bat`
-4. 首次启动会自动安装依赖（约 5-10 分钟）
-5. 安装完成后应用会自动打开
+1. Download and extract the project ZIP
+2. Install Python 3.10+ from https://www.python.org/downloads/
+3. Launch:
+   - **Mac**: Double-click `start.command`
+   - **Windows**: Double-click `start.bat`
+4. First launch auto-installs dependencies (~5-10 min)
+5. App opens automatically after installation
 
-### 配置 API Key
+### API Key Configuration
 
-打开应用后进入「设置」页面，需要配置两个 Key：
+Open the app and go to **Settings** to configure two API keys:
 
-1. **DeepSeek API Key**（用于 AI 问答和笔记生成）
-   - 前往 https://platform.deepseek.com/ 注册获取
-   - 填入 → 点击「测试」→ 绿色"连接成功"→「保存设置」
+1. **DeepSeek API Key** (for AI Q&A and note generation)
+   - Register at https://platform.deepseek.com/
+   - Enter key, click Test, see green Connected, then Save
 
-2. **Groq API Key**（用于语音转录）
-   - 前往 https://console.groq.com/ 注册获取
-   - 填入 → 点击「测试」→ 绿色"连接成功"→「保存设置」
+2. **Groq API Key** (for speech-to-text)
+   - Register at https://console.groq.com/
+   - Enter key, click Test, see green Connected, then Save
 
-### 使用方法
+### Usage
 
-**翻译文档：**
-1. 「课程」→ 创建一门课程
-2. 「知识库」→ 选择课程 → 上传 PDF/PPT/TXT 文件
-3. 「AI Tutor」→ 新建对话 → 输入"请翻译全文"或"请翻译第3页"
+**Translate Documents:**
+1. Courses - Create a course
+2. Knowledge Base - Select course - Upload PDF/PPT/TXT
+3. AI Tutor - New session - Type your translation request
 
-**录音转笔记：**
-1. 「录音分析」→ 选择课程 → 选择音频 → 开始
-2. 自动转录 → 自动生成结构化笔记
+**Lecture Recording to Notes:**
+1. Lecture Analysis - Select course - Choose audio - Start
+2. Auto-transcription - Auto-generate structured notes
 
-**AI 问答：**
-1. 「AI Tutor」→ 新建对话 → 直接提问
-2. AI 会基于已上传的课程资料回答
+**AI Q&A:**
+1. AI Tutor - New session - Ask any question
+2. AI responds based on uploaded course materials with source citations
 
-## 技术栈
-- Eel / Python / SQLite
-- Groq Whisper API (语音转录)
-- ChromaDB + BAAI/bge-small-zh-v1.5 (向量检索)
-- BAAI/bge-reranker-base (交叉编码器精排)
-- DeepSeek API (LLM)
+**Review and Quiz:**
+1. Review - Select course - Generate Quizzes
+2. Start Review - Answer questions - Rate mastery level
+3. SM-2 algorithm schedules next review automatically
+
+## Project Structure
+
+    monad/
+    ├── README.md
+    ├── requirements.txt
+    ├── start.command
+    ├── start.bat
+    ├── .gitignore
+    ├── docs/
+    │   ├── architecture.md
+    │   ├── adr.md
+    │   └── benchmarks.md
+    ├── data/
+    └── app/
+        ├── main.py
+        ├── config.py
+        ├── db.py
+        ├── eval_rag.py
+        ├── repos/
+        ├── services/
+        ├── utils/
+        ├── web/
+        └── prompts/
+
+## Architecture
+
+    Frontend (Eel + HTML/CSS/JS)
+            | @eel.expose (RPC)
+    main.py (API Layer)
+            |
+    +-------+-------+
+    |   Services    |  repos/       |  rag_service.py
+    | tutor_service |  course_repo  |  chunk_document
+    | quiz_service  |  lecture_repo |  retrieve + rerank
+    | doc_service   |  document_repo|  index_document
+    +---------------+  chat_repo    |  
+                       quiz_repo    |
+                       settings_repo|
+                    +------+--------+ +------+------+
+                db.py (SQLite)      ChromaDB (Vector DB)
+
+**Dependency direction (always downward):** main.py - services - repos - db.py
+
+## RAG Pipeline (Two-Stage Retrieval)
+
+    User Query
+       |
+       v
+    Stage 1: Vector Recall
+       |  query -> bge-small-zh-v1.5 -> embedding
+       |  ChromaDB query -> top_k x 3 = 15 candidate chunks
+       |  (with page/source metadata)
+       v
+    Stage 2: Cross-Encoder Reranking
+       |  [query, chunk] pairs -> bge-reranker-base -> scores
+       |  Sort by score descending -> take top_k = 5
+       v
+    Output: context + sources [{page, source, score}]
+
+## SM-2 Spaced Repetition
+
+| Action | ease_factor | interval | repetitions | next_review |
+|--------|-------------|----------|-------------|-------------|
+| Initial (quality=3) | 2.5 | 1 | 0 | Today |
+| Correct (quality=5) | 2.6 | 1 | 1 | +1 day |
+| Correct again (quality=5) | 2.7 | 6 | 2 | +6 days |
+| Incorrect (quality=1) | 2.5 | 1 | 0 | +1 day (reset) |
+
+## Tech Stack
+- **Framework**: Eel (desktop web framework)
+- **Language**: Python 3.10+
+- **Database**: SQLite (data) + ChromaDB (vectors)
+- **Speech-to-Text**: Groq Whisper API (whisper-large-v3)
+- **LLM**: DeepSeek API
+- **Embedding**: BAAI/bge-small-zh-v1.5 (local)
+- **Reranker**: BAAI/bge-reranker-base (local)
+- **Spaced Repetition**: SM-2 algorithm
+
+## License
+MIT
