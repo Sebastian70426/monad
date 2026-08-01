@@ -6,7 +6,8 @@ from chromadb.config import Settings
 logger = logging.getLogger(__name__)
 
 # ChromaDB 持久化路径
-CHROMA_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'chroma')
+from config import DATA_DIR
+CHROMA_PATH = os.path.join(DATA_DIR, 'chroma')
 
 _client = None
 
