@@ -155,19 +155,13 @@ body{display:flex;flex-direction:column;height:100vh}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
     <span data-i18n="sidebar.courses">课程</span>
   </div>
-  <div class="nav-item" data-page="upload">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-    <span data-i18n="sidebar.lectureAnalysis">录音分析</span>
-  </div>
+
   <div class="sec-label" data-i18n="sidebar.sections.ai">智能</div>
   <div class="nav-item" data-page="tutor">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
     <span data-i18n="sidebar.aiTutor">AI Tutor</span>
   </div>
-  <div class="nav-item" data-page="knowledge">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-    <span data-i18n="sidebar.knowledgeBase">知识库</span>
-  </div>
+
   <div class="nav-item" data-page="review">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
     <span>复习</span>
@@ -195,12 +189,12 @@ body{display:flex;flex-direction:column;height:100vh}
   <div class="page-title" id="dbGreeting">下午好，Sebastian</div>
   <div class="page-sub" id="dbSubtitle">今天有 2 门新课需要复习</div>
   <div class="quick-grid">
-    <div class="quick-card" onclick="navigateTo('upload')">
+    <div class="quick-card" onclick="quickNewRecording()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
       <span class="qc-title" data-i18n="dashboard.quickActions.newRecording">新录音</span>
       <span class="qc-desc" data-i18n="dashboard.quickActions.newRecordingDesc">上传课堂录音</span>
     </div>
-    <div class="quick-card" onclick="navigateTo('courses')">
+    <div class="quick-card" onclick="quickAskAI()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
       <span class="qc-title" data-i18n="dashboard.quickActions.aiQuestion">AI 提问</span>
       <span class="qc-desc" data-i18n="dashboard.quickActions.aiQuestionDesc">向 AI 提问</span>
@@ -240,12 +234,27 @@ body{display:flex;flex-direction:column;height:100vh}
   <div class="page-title" id="cdCourseName"></div><div class="page-sub" id="cdCourseMeta"></div>
   <div class="tabs">
     <div class="tab-item active" data-tab="lectures" onclick="switchTab('lectures')" data-i18n="courseDetail.tabs.lectures">课堂记录</div>
-    <div class="tab-item" data-tab="files" onclick="switchTab('files')" data-i18n="courseDetail.tabs.files">课程文件</div>
-    <div class="tab-item" data-tab="ai" onclick="switchTab('ai')" data-i18n="courseDetail.tabs.ai">AI 问答</div>
+    <div class="tab-item" data-tab="files" onclick="switchTab('files')">课程资料</div>
+    <div class="tab-item" data-tab="ai" onclick="switchTab('ai')">AI Tutor</div>
   </div>
-  <div id="tab-lectures" class="lecture-list"></div>
-  <div id="tab-files" class="placeholder-tab hidden"><div class="pt-icon">📂</div><div class="pt-text" data-i18n="courseDetail.filesPlaceholder">课程文件功能将于 V2 上线</div></div>
-  <div id="tab-ai" class="placeholder-tab hidden"><div class="pt-icon">💬</div><div class="pt-text" data-i18n="courseDetail.aiPlaceholder">AI 问答功能将于 V2 上线</div></div>
+  <div id="tab-lectures">
+    <div style="margin-bottom:var(--space-4)">
+      <button class="btn-secondary" onclick="uploadAudioInCourse()" style="height:36px">🎤 上传课堂录音</button>
+    </div>
+    <div class="lecture-list" id="lectureListInner"></div>
+  </div>
+  <div id="tab-files" class="hidden">
+    <div style="margin-bottom:var(--space-4)">
+      <button class="btn-secondary" onclick="uploadDocumentInCourse()" style="height:36px">+ 上传文档</button>
+    </div>
+    <div id="courseDocList" class="lecture-list"></div>
+  </div>
+  <div id="tab-ai" class="hidden">
+    <div style="margin-bottom:var(--space-4)">
+      <button class="btn-secondary" onclick="createTutorInCourse()" style="height:36px">+ 新建对话</button>
+    </div>
+    <div id="courseChatList" class="lecture-list"></div>
+  </div>
 </div></template>
 
 <template id="tpl-note"><div class="page-view">
@@ -303,6 +312,17 @@ body{display:flex;flex-direction:column;height:100vh}
       <div id="reviewTotalCount" style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--text-primary)">0</div>
       <div style="font-size:var(--text-sm);color:var(--text-tertiary);margin-top:4px">道题目已生成</div>
     </div>
+  </div>
+  <div class="panel" style="margin-bottom:var(--space-6)">
+    <div class="panel-header">记忆保留度 (Ebbinghaus)</div>
+    <div id="curveStats" style="display:flex;gap:var(--space-6);flex-wrap:wrap;margin-top:var(--space-3)">
+      <div><span style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--accent)" id="avgRetention">--</span><div style="font-size:var(--text-xs);color:var(--text-tertiary)">平均保留度</div></div>
+      <div><span style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--green)" id="masteredCount">--</span><div style="font-size:var(--text-xs);color:var(--text-tertiary)">已掌握</div></div>
+      <div><span style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--red)" id="needsReviewCount">--</span><div style="font-size:var(--text-xs);color:var(--text-tertiary)">需复习</div></div>
+      <div><span style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--text-primary)" id="avgStrength">--</span><div style="font-size:var(--text-xs);color:var(--text-tertiary)">平均记忆强度</div></div>
+    </div>
+    <div id="curveChart" style="margin-top:var(--space-4);height:120px;position:relative"></div>
+    <div id="curveList" style="margin-top:var(--space-4)"></div>
   </div>
   <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-6)">
     <select class="lang-select" id="reviewCourseSelect" style="flex:1">
@@ -431,7 +451,7 @@ function mountPage(page, tpl) {
   _currentPage = page;
   var initMap = {
     'dashboard': initDashboard, 'courses': initCourses, 'course-detail': initCourseDetail,
-    'note': initNote, 'upload': initUpload, 'settings': initSettings, 'knowledge': initKnowledge, 'tutor': initTutor, 'review': initReview
+    'note': initNote, 'settings': initSettings, 'tutor': initTutor, 'review': initReview
   };
   if (initMap[page]) initMap[page]();
   if (i18n._loaded) i18n.applyTranslations();
@@ -474,6 +494,30 @@ async function initDashboard() {
   if (rn) rn.innerHTML = '<div class="empty-block"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div class="eb-text">'+i18n.t('dashboard.empty.noNotes')+'</div></div>';
 }
 
+// ── Dashboard Quick Actions ──
+async function quickNewRecording() {
+  var r = await eel.api_list_courses()();
+  if (!r.success || r.courses.length === 0) {
+    alert('请先创建一门课程');
+    navigateTo('courses');
+    return;
+  }
+  var courseNames = r.courses.map(function(c) { return c.id + ':' + c.name; });
+  var choice = prompt('选择课程:\n' + r.courses.map(function(c, i) { return (i+1) + '. ' + c.name; }).join('\n') + '\n\n输入序号:');
+  if (!choice) return;
+  var idx = parseInt(choice) - 1;
+  if (idx < 0 || idx >= r.courses.length) { alert('无效选择'); return; }
+  navigateTo('course-detail', {courseId: r.courses[idx].id});
+  setTimeout(function() { switchTab('lectures'); }, 300);
+}
+
+async function quickAskAI() {
+  navigateTo('tutor');
+  setTimeout(function() {
+    if (!_tutorSessionId) createTutorSession();
+  }, 300);
+}
+
 // ── Courses ──
 async function initCourses() {
   try {
@@ -496,13 +540,108 @@ async function createCourse() { var inp = document.getElementById('newCourseName
 var _cdCourseId = null;
 async function initCourseDetail() { _cdCourseId = _pageParams.courseId; if (!_cdCourseId) { navigateTo('courses'); return; } var cr = await eel.api_get_course(_cdCourseId)(); if (!cr.success) { navigateTo('courses'); return; } document.getElementById('cdCourseName').textContent = cr.course.name; document.getElementById('cdCourseMeta').textContent = i18n.t('courseDetail.detail'); await loadLectures(); }
 async function loadLectures() {
-  var ct = document.getElementById('tab-lectures'); if (!ct) return;
+  var ct = document.getElementById('lectureListInner'); if (!ct) return;
   var lr = await eel.api_get_lectures(_cdCourseId)();
   if (!lr.success || !lr.lectures || lr.lectures.length === 0) { ct.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><div class="es-title">'+i18n.t('courseDetail.empty.title')+'</div><div class="es-desc">'+i18n.t('courseDetail.empty.desc')+'</div><button class="btn" style="width:auto;padding:0 24px" onclick="navigateTo(\'upload\')">'+i18n.t('courseDetail.empty.action')+'</button></div>'; return; }
   var h = '';
   for (var i = 0; i < lr.lectures.length; i++) { var l = lr.lectures[i]; var badge = l.has_note ? '<span class="lc-badge lc-badge-has-note">'+i18n.t('courseDetail.badge.hasNote')+'</span>' : '<span class="lc-badge lc-badge-no-note">'+i18n.t('courseDetail.badge.noNote')+'</span>'; h += '<div class="lecture-card" onclick="navigateTo(\'note\',{lectureId:'+l.id+'})"><div class="lc-header"><span class="lc-title">'+l.title+'</span>'+badge+'</div><div class="lc-meta">'+l.created_at+'</div></div>'; }
   ct.innerHTML = h;
   document.getElementById('cdCourseMeta').textContent = i18n.t('courseDetail.lectureCount', {count: lr.lectures.length});
+}
+
+async function loadCourseDocuments() {
+  var r = await eel.api_get_documents(_cdCourseId)();
+  var container = document.getElementById('courseDocList');
+  if (!container) return;
+  if (!r.success || !r.documents || r.documents.length === 0) {
+    container.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div class="es-title">还没有课程资料</div><div class="es-desc">点击上方按钮上传 PDF/PPT</div></div>';
+    return;
+  }
+  var h = '';
+  for (var i = 0; i < r.documents.length; i++) {
+    var d = r.documents[i];
+    var icon = d.file_type === '.pdf' ? '📄' : (d.file_type === '.pptx' || d.file_type === '.ppt' ? '📊' : '📝');
+    var chunks = d.chunk_count > 0 ? ' · ' + d.chunk_count + ' chunks' : '';
+    h += '<div class="lecture-card"><div class="lc-header"><span class="lc-title">' + icon + ' ' + d.filename + '</span><span class="fi-remove" style="cursor:pointer;color:var(--text-tertiary)" onclick="deleteDocumentInCourse(' + d.id + ')">删除</span></div><div class="lc-meta">' + d.created_at + chunks + '</div></div>';
+  }
+  container.innerHTML = h;
+}
+
+async function deleteDocumentInCourse(docId) {
+  if (!confirm('确认删除这个文档？')) return;
+  var r = await eel.api_delete_document(docId)();
+  if (r.success) loadCourseDocuments();
+  else alert(r.error || '删除失败');
+}
+
+async function uploadDocumentInCourse() {
+  var r = await eel.api_select_document_file()();
+  if (!r.success) return;
+  var btn = event.target;
+  var oldText = btn.textContent;
+  btn.disabled = true; btn.textContent = '上传中...';
+  var ur = await eel.api_upload_document(r.path, _cdCourseId)();
+  btn.disabled = false; btn.textContent = oldText;
+  if (ur.success) loadCourseDocuments();
+  else alert(ur.error || '上传失败');
+}
+
+async function loadCourseChatSessions() {
+  var r = await eel.api_get_chat_sessions(_cdCourseId)();
+  var container = document.getElementById('courseChatList');
+  if (!container) return;
+  if (!r.success || !r.sessions || r.sessions.length === 0) {
+    container.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><div class="es-title">还没有对话</div><div class="es-desc">点击上方按钮新建对话</div></div>';
+    return;
+  }
+  var h = '';
+  for (var i = 0; i < r.sessions.length; i++) {
+    var s = r.sessions[i];
+    h += '<div class="lecture-card" style="cursor:pointer" onclick="openTutorSession(' + s.id + ')"><div class="lc-header"><span class="lc-title">💬 ' + (s.title || '对话 #' + s.id) + '</span></div><div class="lc-meta">' + s.updated_at + '</div></div>';
+  }
+  container.innerHTML = h;
+}
+
+async function createTutorInCourse() {
+  var r = await eel.api_create_chat_session(_cdCourseId, null)();
+  if (r.success) {
+    navigateTo('tutor');
+    setTimeout(function() {
+      if (typeof _tutorSessionId !== 'undefined') _tutorSessionId = r.session.id;
+      if (typeof selectTutorSession === 'function') selectTutorSession(r.session.id);
+    }, 500);
+  }
+}
+
+async function openTutorSession(sessionId) {
+  navigateTo('tutor');
+  setTimeout(function() {
+    if (typeof selectTutorSession === 'function') selectTutorSession(sessionId);
+  }, 500);
+}
+
+async function uploadAudioInCourse() {
+  var r = await eel.api_select_audio_file()();
+  if (!r.success) return;
+  var btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '处理中...';
+  var copyResult = await eel.api_copy_audio(r.path, _cdCourseId)();
+  var tr = await eel.api_transcribe_audio(copyResult.path, _cdCourseId)();
+  if (!tr.success) {
+    btn.disabled = false;
+    btn.textContent = '🎤 上传课堂录音';
+    alert('转录失败: ' + tr.error);
+    return;
+  }
+  var nr = await eel.api_generate_note(tr.lecture_id)();
+  btn.disabled = false;
+  btn.textContent = '🎤 上传课堂录音';
+  if (nr.success) {
+    loadLectures();
+  } else {
+    alert('笔记生成失败: ' + nr.error);
+  }
 }
 function switchTab(tab) { document.querySelectorAll('.tab-item').forEach(function(t){ t.classList.remove('active'); }); var ti = document.querySelector('.tab-item[data-tab="'+tab+'"]'); if (ti) ti.classList.add('active'); var tl = document.getElementById('tab-lectures'), tf = document.getElementById('tab-files'), ta = document.getElementById('tab-ai'); if (tl) tl.classList.toggle('hidden', tab !== 'lectures'); if (tf) tf.classList.toggle('hidden', tab !== 'files'); if (ta) ta.classList.toggle('hidden', tab !== 'ai'); }
 
@@ -596,6 +735,32 @@ var _tutorSessionId = null;
 var _tutorStreamBuffer = '';
 var _tutorStreamEl = null;
 var _tutorPendingSources = [];
+
+// Eel callback for multi-agent streaming
+function start_agent_stream(agentType, diagnosis, sources) {
+  _tutorStreamBuffer = '';
+  _tutorPendingSources = sources || [];
+  var msgs = document.getElementById('tutorMessages');
+
+  // Agent 标识
+  var agentLabels = {
+    'explanation': '📖 讲解 Agent',
+    'quiz': '✏️ 出题 Agent',
+    'correction': '⚠️ 纠错 Agent'
+  };
+  var label = agentLabels[agentType] || '🧠 AI Tutor';
+
+  // 诊断信息
+  var diagHtml = '';
+  if (diagnosis && diagnosis.weak_points && diagnosis.weak_points.length > 0) {
+    diagHtml = '<div style="font-size:10px;color:var(--text-tertiary);margin-bottom:2px">💡 识别薄弱: ' + diagnosis.weak_points.join(', ') + '</div>';
+  }
+
+  msgs.insertAdjacentHTML('beforeend', '<div class="tutor-msg assistant" id="_tutorStreaming"><div class="tutor-label">' + label + '</div>' + diagHtml + '<div class="tutor-bubble assistant" id="_tutorStreamBubble"></div></div>');
+  _tutorStreamEl = document.getElementById('_tutorStreamBubble');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+eel.expose(start_agent_stream);
 
 // Eel callbacks (Python -> JS)
 function start_tutor_stream(sources) {
@@ -883,6 +1048,7 @@ async function initReview() {
   s.innerHTML = h;
   await refreshReviewStats();
   await loadQuizList();
+  await loadCurveStats();
 }
 
 async function refreshReviewStats() {
@@ -892,6 +1058,76 @@ async function refreshReviewStats() {
     document.getElementById('reviewDueCount').textContent = r.stats.due_today;
     document.getElementById('reviewTotalCount').textContent = r.stats.total;
   }
+}
+
+async function loadCurveStats() {
+  var cid = document.getElementById('reviewCourseSelect').value || null;
+  try {
+    var r = await eel.api_get_curve_stats(cid)();
+    if (r.success && r.stats.total > 0) {
+      document.getElementById('avgRetention').textContent = (r.stats.avg_retention * 100).toFixed(0) + '%';
+      document.getElementById('masteredCount').textContent = r.stats.mastered;
+      document.getElementById('needsReviewCount').textContent = r.stats.needs_review;
+      document.getElementById('avgStrength').textContent = r.stats.avg_strength.toFixed(1);
+    } else {
+      document.getElementById('avgRetention').textContent = '--';
+      document.getElementById('masteredCount').textContent = '0';
+      document.getElementById('needsReviewCount').textContent = '0';
+      document.getElementById('avgStrength').textContent = '--';
+    }
+    await loadCurveList(cid);
+  } catch(e) {}
+}
+
+async function loadCurveList(cid) {
+  try {
+    var r = await eel.api_get_forgetting_curves(cid)();
+    var container = document.getElementById('curveList');
+    if (!container) return;
+    if (!r.success || !r.curves || r.curves.length === 0) {
+      container.innerHTML = '<div style="color:var(--text-tertiary);font-size:var(--text-sm);text-align:center;padding:var(--space-4)">暂无记忆数据，完成复习后这里会显示遗忘曲线</div>';
+      return;
+    }
+    var h = '';
+    for (var i = 0; i < r.curves.length; i++) {
+      var c = r.curves[i];
+      var pct = (c.current_retention * 100).toFixed(0);
+      var barColor = c.current_retention >= 0.7 ? 'var(--green)' : (c.current_retention >= 0.4 ? 'var(--accent)' : 'var(--red)');
+      var statusIcon = c.needs_review ? '🔴' : '🟢';
+      h += '<div class="lecture-card" style="margin-bottom:8px;cursor:pointer" onclick="showCurveChart('+c.review_id+')">';
+      h += '<div class="lc-header"><span class="lc-title" style="font-size:var(--text-sm)">'+statusIcon+' '+c.question.substring(0,40)+(c.question.length>40?'...':'')+'</span>';
+      h += '<span style="font-size:var(--text-xs);color:var(--text-tertiary)">S='+c.memory_strength.toFixed(1)+'</span></div>';
+      h += '<div style="display:flex;align-items:center;gap:var(--space-2);margin-top:6px">';
+      h += '<div style="flex:1;height:6px;background:var(--bg-input);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+barColor+';border-radius:3px;transition:width 300ms"></div></div>';
+      h += '<span style="font-size:var(--text-xs);color:var(--text-tertiary);min-width:36px;text-align:right">'+pct+'%</span>';
+      h += '</div></div>';
+    }
+    container.innerHTML = h;
+  } catch(e) {}
+}
+
+async function showCurveChart(reviewId) {
+  try {
+    var r = await eel.api_get_curve_chart(reviewId)();
+    if (!r.success) return;
+    var data = r.data;
+    var chart = document.getElementById('curveChart');
+    if (!chart) return;
+
+    // Simple CSS bar chart
+    var h = '<div style="display:flex;align-items:flex-end;gap:2px;height:100%;padding:0 4px">';
+    for (var i = 0; i < data.chart_data.length; i++) {
+      var d = data.chart_data[i];
+      var height = Math.max(2, d.retention * 100);
+      var color = d.is_today ? 'var(--accent)' : (d.is_threshold ? 'var(--red)' : 'var(--accent-muted)');
+      var opacity = d.is_today ? 1.0 : 0.4 + d.retention * 0.4;
+      h += '<div style="flex:1;height:'+height+'%;background:'+color+';opacity:'+opacity+';border-radius:2px 2px 0 0;min-width:4px" title="Day '+d.day+': '+(d.retention*100).toFixed(0)+'%"></div>';
+    }
+    h += '</div>';
+    h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-xs);color:var(--text-tertiary);margin-top:4px"><span>Day 0</span><span style="color:var(--accent)">Now: Day '+data.current_day+' ('+(data.current_retention*100).toFixed(0)+'%)</span><span>Day 30</span></div>';
+
+    chart.innerHTML = h;
+  } catch(e) {}
 }
 
 async function loadQuizList() {

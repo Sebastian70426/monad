@@ -119,6 +119,43 @@ def init_db():
             created_at  TEXT    DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (quiz_id) REFERENCES quizzes(id)
         );
+
+        CREATE TABLE IF NOT EXISTS knowledge_points (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            course_id   INTEGER NOT NULL,
+            name        TEXT    NOT NULL,
+            description TEXT,
+            parent_id   INTEGER,
+            created_at  TEXT    DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (course_id) REFERENCES courses(id),
+            FOREIGN KEY (parent_id) REFERENCES knowledge_points(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS knowledge_dependencies (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            point_id    INTEGER NOT NULL,
+            depends_on_id INTEGER NOT NULL,
+            FOREIGN KEY (point_id) REFERENCES knowledge_points(id),
+            FOREIGN KEY (depends_on_id) REFERENCES knowledge_points(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS quiz_knowledge_points (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            quiz_id     INTEGER NOT NULL,
+            point_id    INTEGER NOT NULL,
+            FOREIGN KEY (quiz_id) REFERENCES quizzes(id),
+            FOREIGN KEY (point_id) REFERENCES knowledge_points(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS knowledge_mastery (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            point_id    INTEGER NOT NULL UNIQUE,
+            mastery_level  REAL DEFAULT 0.0,
+            total_reviews  INTEGER DEFAULT 0,
+            correct_reviews INTEGER DEFAULT 0,
+            last_updated   TEXT,
+            FOREIGN KEY (point_id) REFERENCES knowledge_points(id)
+        );
         ''')
 
 

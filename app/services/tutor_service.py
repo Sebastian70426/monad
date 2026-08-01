@@ -49,7 +49,7 @@ def _load_prompt(intent):
     filepath = os.path.join(prompt_dir, filename)
 
     if not os.path.exists(filepath):
-        return "你是一位大学课程助教。请根据提供的课程资料回答学生问题。如果资料不足以回答,请明确说明,不要编造。使用中文回答,专业术语请提供中英文对照。"
+        return "你是一位大学课程助教。请回答学生的问题。如果提供了课程资料,请优先参考。如果没有课程资料,请用你自己的知识详细回答。使用中文回答,专业术语请提供中英文对照。"
 
     with open(filepath, 'r', encoding='utf-8') as f:
         return f.read()

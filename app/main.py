@@ -5,7 +5,7 @@ import os
 import time
 from openai import OpenAI
 from db import init_db
-from repos import course_repo, lecture_repo, document_repo, chat_repo, settings_repo, quiz_repo
+from repos import course_repo, lecture_repo, document_repo, chat_repo, settings_repo, quiz_repo, knowledge_repo
 from services.rag_service import index_document, retrieve_context
 
 # ========== 语音识别模块 ==========
@@ -577,6 +577,53 @@ def api_delete_quiz(quiz_id):
     """删除测验题"""
     quiz_repo.delete_quiz(int(quiz_id))
     return {"success": True}
+
+
+# ========== Knowledge Points ==========
+
+@eel.expose
+def api_extract_knowledge_points(course_id):
+    """从课程笔记提取知识点图谱"""
+    from services.knowledge_service import extract_knowledge_points
+    api_key = settings_repo.get('deepseek_key')
+    if not api_key:
+        return {"success": False, "error": "请先配置 DeepSeek API Key"}
+    return extract_knowledge_points(int(course_id), api_key)
+
+
+@eel.expose
+def api_get_knowledge_points(course_id):
+    """获取某课程的知识点列表（含掌握度）"""
+    import json
+    points = knowledge_repo.get_all_mastery(int(course_id))
+    # 获取依赖关系
+    for p in points:
+        deps = knowledge_repo.get_dependencies(p['id'])
+        p['dependencies'] = [d['depends_on_id'] for d in deps]
+    return {"success": True, "points": points}
+
+
+@eel.expose
+def api_get_weak_points(course_id):
+    """获取薄弱知识点"""
+    weak = knowledge_repo.get_weak_points(int(course_id))
+    return {"success": True, "weak_points": weak}
+
+
+@eel.expose
+def api_link_quizzes_to_knowledge(course_id):
+    """将课程下所有测验题关联到知识点"""
+    from services.knowledge_service import link_quiz_to_knowledge
+    api_key = settings_repo.get('deepseek_key')
+    if not api_key:
+        return {"success": False, "error": "请先配置 DeepSeek API Key"}
+    quizzes = quiz_repo.get_quizzes_by_course(int(course_id))
+    linked = 0
+    for q in quizzes:
+        result = link_quiz_to_knowledge(q['id'], int(course_id), api_key)
+        if result.get('success'):
+            linked += result.get('linked', 0)
+    return {"success": True, "linked": linked, "total": len(quizzes)}
 
 
 if __name__ == '__main__':

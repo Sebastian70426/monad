@@ -93,12 +93,32 @@ def update_review(review_id, quality):
         (quality, ef, interval, reps, next_review, review_id)
     )
 
+    # 更新关联知识点的掌握度
+    try:
+        from repos import knowledge_repo
+        is_correct = quality >= 3
+        linked_points = knowledge_repo.get_points_by_quiz(review['quiz_id'])
+        for p in linked_points:
+            knowledge_repo.update_mastery(p['id'], is_correct)
+    except Exception:
+        pass
+
+    # 记录艾宾浩斯遗忘曲线日志
+    try:
+        from services.ebbinghaus_service import get_review_with_curve, log_review
+        curve = get_review_with_curve(review_id)
+        retention_before = curve['current_retention'] if curve else 0.0
+        log_result = log_review(review_id, quality, retention_before)
+    except Exception as e:
+        log_result = None
+
     return {
         "review_id": review_id,
         "ease_factor": ef,
         "interval": interval,
         "repetitions": reps,
-        "next_review": next_review
+        "next_review": next_review,
+        "ebbinghaus": log_result
     }
 
 
