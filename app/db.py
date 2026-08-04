@@ -41,6 +41,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS courses (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             name        TEXT    NOT NULL UNIQUE,
+            archived    INTEGER DEFAULT 0,
             created_at  TEXT    DEFAULT (datetime('now','localtime'))
         );
 
@@ -157,6 +158,12 @@ def init_db():
             FOREIGN KEY (point_id) REFERENCES knowledge_points(id)
         );
         ''')
+
+    # 兼容旧库：如果 courses 表缺 archived 列则补上
+    try:
+        conn.execute("ALTER TABLE courses ADD COLUMN archived INTEGER DEFAULT 0")
+    except Exception:
+        pass
 
 
 def execute(sql, params=()):

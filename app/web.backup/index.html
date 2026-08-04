@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Monad</title>
+<script src="/eel.js"></script>
+<script src="js/i18n.js"></script>
+<link rel="stylesheet" href="css/design-system.css">
+<style>
+body{display:flex;flex-direction:column;height:100vh}
+#titlebar{height:var(--titlebar-h);flex-shrink:0;background:linear-gradient(180deg,rgba(255,255,255,0.03) 0%,rgba(255,255,255,0) 100%),#0D0D0D;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:center;-webkit-app-region:drag}
+#titlebar span{font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--text-tertiary);letter-spacing:0.2px}
+#body-wrap{display:flex;flex:1;overflow:hidden}
+#sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--bg-sidebar);border-right:1px solid var(--border-subtle);display:flex;flex-direction:column;padding:var(--space-3)}
+#sidebar .logo{font-size:var(--text-sm);font-weight:var(--weight-semibold);color:var(--text-primary);padding:var(--space-2) var(--space-3);margin-bottom:var(--space-3);letter-spacing:-0.2px}
+#sidebar .sec-label{font-size:var(--text-xs);font-weight:var(--weight-medium);color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.6px;padding:var(--space-3) var(--space-3) var(--space-1)}
+#sidebar .nav-item{display:flex;align-items:center;gap:var(--space-2);padding:0 var(--space-3);height:34px;border-radius:var(--radius-sm);font-size:var(--text-sm);font-weight:var(--weight-regular);color:var(--text-secondary);cursor:pointer;transition:all var(--ease-fast);position:relative}
+#sidebar .nav-item:hover{background:var(--bg-card);color:var(--text-primary)}
+#sidebar .nav-item.active{background:var(--accent-muted);color:var(--text-primary);font-weight:var(--weight-medium)}
+#sidebar .nav-item.active::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:2.5px;border-radius:2px;background:var(--accent);box-shadow:0 0 8px var(--accent-glow);animation:indIn 200ms cubic-bezier(0.16,1,0.3,1)}
+@keyframes indIn{from{transform:scaleY(0);opacity:0}to{transform:scaleY(1);opacity:1}}
+#sidebar .nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.45}
+#sidebar .nav-item:hover svg{opacity:0.70}
+#sidebar .nav-item.active svg{opacity:1;color:var(--accent)}
+#sidebar .nav-item.disabled{opacity:0.30;cursor:not-allowed;pointer-events:none}
+#sidebar .user{margin-top:auto;padding:var(--space-3);font-size:var(--text-sm);color:var(--text-tertiary);display:flex;align-items:center;gap:var(--space-2)}
+#sidebar .user .avatar{width:22px;height:22px;border-radius:var(--radius-sm);background:var(--bg-card);display:flex;align-items:center;justify-content:center;font-size:11px}
+#content-slot{flex:1;background:var(--bg-surface);padding:var(--space-8);overflow-y:auto;position:relative}
+.page-view{animation:pgEnter 220ms cubic-bezier(0.16,1,0.3,1)}
+.page-view.exiting{animation:pgExit 120ms cubic-bezier(0.4,0,1,1) forwards;pointer-events:none}
+@keyframes pgEnter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pgExit{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-6px)}}
+#statusbar{height:var(--statusbar-h);flex-shrink:0;background:#0A0A0A;border-top:1px solid var(--border-subtle);display:flex;align-items:center;padding:0 var(--space-4);gap:var(--space-5);font-size:var(--text-xs);color:var(--text-tertiary)}
+#statusbar .dot{width:5px;height:5px;border-radius:50%;background:var(--green)}
+.page-title{font-size:var(--text-2xl);font-weight:var(--weight-bold);letter-spacing:-0.4px;margin-bottom:4px;color:var(--text-primary)}
+.page-sub{font-size:var(--text-base);color:var(--text-secondary);font-weight:var(--weight-regular);margin-bottom:var(--space-8)}
+.back-link{display:inline-flex;align-items:center;gap:4px;font-size:var(--text-sm);color:var(--text-secondary);cursor:pointer;margin-bottom:var(--space-4);transition:color var(--ease-fast)}
+.back-link:hover{color:var(--text-primary)}.back-link svg{width:14px;height:14px}
+.panel{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-xl);padding:var(--space-5);transition:all var(--ease-normal)}
+.panel-header{font-size:var(--text-xs);font-weight:var(--weight-semibold);color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:var(--space-4)}
+.quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4);margin-bottom:var(--space-8)}
+.quick-card{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-2xl);padding:var(--space-5);cursor:pointer;transition:all var(--ease-normal);display:flex;flex-direction:column;gap:var(--space-2)}
+.quick-card:hover{background:var(--bg-card-hover);border-color:var(--border-visible);transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.quick-card:active{transform:translateY(0);box-shadow:var(--shadow-xs);transition:all 80ms ease-in}
+.quick-card svg{width:22px;height:22px;opacity:0.65;color:var(--accent)}
+.quick-card .qc-title{font-size:var(--text-lg);font-weight:var(--weight-semibold);color:var(--text-primary);letter-spacing:0.01em}
+.quick-card .qc-desc{font-size:var(--text-sm);color:var(--text-tertiary);font-weight:var(--weight-regular);line-height:1.65}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-8)}
+.course-row{padding:var(--space-2) 0;font-size:var(--text-sm);color:var(--text-secondary);display:flex;align-items:center;gap:var(--space-2);cursor:pointer;transition:color var(--ease-fast)}
+.course-row:hover{color:var(--text-primary)}.course-row svg{width:14px;height:14px;opacity:0.50;flex-shrink:0}
+.empty-block{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:var(--space-6) 0;text-align:center;gap:var(--space-2)}
+.empty-block svg{width:28px;height:28px;opacity:0.18;color:var(--text-tertiary)}
+.empty-block .eb-text{font-size:var(--text-sm);color:var(--text-tertiary);line-height:1.6;max-width:200px}
+.tabs{display:flex;gap:0;margin-bottom:var(--space-6);border-bottom:1px solid var(--border-subtle)}
+.tab-item{padding:var(--space-2) var(--space-4);font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--text-secondary);cursor:pointer;position:relative;transition:color var(--ease-fast)}
+.tab-item:hover{color:var(--text-primary)}.tab-item.active{color:var(--text-primary);font-weight:var(--weight-semibold)}
+.tab-item.active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:var(--accent);border-radius:1px}
+.lecture-list{display:flex;flex-direction:column;gap:var(--space-3)}
+.lecture-card{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:var(--space-4);cursor:pointer;transition:all var(--ease-normal)}
+.lecture-card:hover{background:var(--bg-card-hover);border-color:var(--border-visible);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.lecture-card .lc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.lecture-card .lc-title{font-size:var(--text-base);font-weight:var(--weight-semibold);color:var(--text-primary)}
+.lecture-card .lc-meta{font-size:var(--text-sm);color:var(--text-tertiary)}
+.lc-badge{font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-full);font-weight:var(--weight-medium)}
+.lc-badge-has-note{background:rgba(52,211,153,0.10);color:var(--green)}
+.lc-badge-no-note{background:var(--bg-input);color:var(--text-tertiary)}
+.step-label{font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--text-secondary);margin-bottom:4px}
+.upload-select{width:100%;height:36px;padding:0 var(--space-3);background:var(--bg-input);border:1px solid var(--border-default);border-radius:var(--radius-sm);font-size:var(--text-sm);color:var(--text-primary);outline:none;cursor:pointer;margin-bottom:var(--space-6);appearance:none}
+.upload-select:focus{border-color:var(--accent);box-shadow:var(--shadow-glow)}
+.upload-zone{border:2px dashed rgba(255,255,255,0.10);border-radius:var(--radius-2xl);padding:48px;text-align:center;cursor:pointer;transition:all var(--ease-normal);margin-bottom:var(--space-6)}
+.upload-zone:hover{border-color:var(--accent);background:var(--accent-muted)}
+.upload-zone svg{width:32px;height:32px;margin-bottom:var(--space-3);opacity:0.45;transition:all var(--ease-normal)}
+.upload-zone:hover svg{opacity:0.75;transform:scale(1.05)}
+.upload-zone .uz-text{font-size:var(--text-base);color:var(--text-secondary);font-weight:var(--weight-medium)}
+.upload-zone .uz-hint{font-size:var(--text-sm);color:var(--text-tertiary);margin-top:4px}
+.file-info-card{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-xl);padding:var(--space-4);margin-bottom:var(--space-6);display:flex;justify-content:space-between;align-items:center}
+.file-info-card .fi-name{font-size:var(--text-base);font-weight:var(--weight-medium);color:var(--text-primary)}
+.file-info-card .fi-meta{font-size:var(--text-sm);color:var(--text-secondary);margin-top:2px}
+.file-info-card .fi-remove{font-size:var(--text-sm);color:var(--text-tertiary);cursor:pointer;padding:4px 8px;border-radius:var(--radius-sm);transition:all var(--ease-fast)}
+.file-info-card .fi-remove:hover{color:var(--red);background:rgba(248,113,113,0.08)}
+.btn{width:100%;height:40px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:var(--text-base);font-weight:var(--weight-semibold);cursor:pointer;transition:all var(--ease-fast)}
+.btn:hover{background:var(--accent-hover);box-shadow:0 4px 12px var(--accent-glow)}
+.btn:active{transform:scale(0.97);box-shadow:0 1px 4px rgba(0,0,0,0.3)}
+.btn:disabled{opacity:0.35;cursor:not-allowed;box-shadow:none}
+.btn-secondary{background:var(--bg-card);border:1px solid var(--border-default);color:var(--text-primary);height:36px;padding:0 var(--space-4);border-radius:var(--radius-sm);font-size:var(--text-sm);cursor:pointer;transition:all var(--ease-fast)}
+.btn-secondary:hover{background:var(--bg-card-hover);border-color:var(--border-visible)}
+.progress-section{margin-top:var(--space-6)}
+.progress-bar{height:5px;background:var(--border-subtle);border-radius:3px;margin-bottom:var(--space-4);overflow:hidden}
+.progress-bar .fill{height:100%;background:var(--accent);border-radius:3px;width:0;transition:width 400ms ease-out}
+.progress-step{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) 0;font-size:var(--text-sm)}
+.progress-step .ps-icon{width:18px;text-align:center;flex-shrink:0}
+.ps-done{color:var(--green)}.ps-active{color:var(--accent)}.ps-wait{color:var(--text-tertiary)}
+.note-box{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-xl);padding:var(--space-5);margin-top:var(--space-6);line-height:var(--leading-relaxed)}
+.note-box h3{font-size:var(--text-lg);font-weight:var(--weight-semibold);margin-bottom:var(--space-4);color:var(--text-primary)}
+.settings-card{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-xl);padding:var(--space-5);margin-bottom:var(--space-4)}
+.settings-card .sc-title{font-size:var(--text-xs);font-weight:var(--weight-semibold);color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px}
+.settings-field-label{display:block;font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--text-secondary);margin-bottom:6px}
+.input-row{display:flex;gap:var(--space-2)}
+.input-row input{flex:1;height:36px;padding:0 var(--space-3);background:var(--bg-input);border:1px solid var(--border-default);border-radius:var(--radius-sm);font-size:var(--text-sm);color:var(--text-primary);outline:none}
+.input-row input:focus{border-color:var(--accent);box-shadow:var(--shadow-glow)}
+.btn-test{height:36px;padding:0 var(--space-4);background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-sm);font-size:var(--text-sm);color:var(--text-secondary);cursor:pointer;transition:all var(--ease-fast)}
+.btn-test:hover{background:var(--bg-card-hover);color:var(--text-primary)}
+.btn-save{width:100%;height:40px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:var(--text-base);font-weight:var(--weight-semibold);cursor:pointer;transition:all var(--ease-fast);margin-top:var(--space-2)}
+.btn-save:hover{background:var(--accent-hover);box-shadow:0 4px 12px var(--accent-glow)}
+.btn-save:active{transform:scale(0.97)}
+.status-msg{font-size:var(--text-sm);margin-top:4px}.status-msg.ok{color:var(--green)}.status-msg.fail{color:var(--red)}
+.lang-select{width:100%;height:36px;padding:0 var(--space-3);background:var(--bg-input);border:1px solid var(--border-default);border-radius:var(--radius-sm);font-size:var(--text-sm);color:var(--text-primary);outline:none;cursor:pointer;appearance:none}
+.lang-select:focus{border-color:var(--accent);box-shadow:var(--shadow-glow)}
+.note-section{margin-bottom:var(--space-6)}
+.note-section-title{font-size:var(--text-xs);font-weight:var(--weight-semibold);color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:var(--space-3)}
+.note-summary{background:var(--bg-card);border-left:3px solid var(--accent);border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:var(--space-4);line-height:var(--leading-relaxed);box-shadow:0 0 12px rgba(129,140,248,0.06)}
+.note-concept-item{display:flex;gap:var(--space-2);padding:var(--space-2) 0;font-size:var(--text-base);line-height:var(--leading-relaxed);color:var(--text-secondary)}
+.note-concept-item .nci-dot{color:var(--accent);flex-shrink:0;margin-top:2px}
+.equation-block{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-2);font-family:var(--font-mono);font-size:var(--text-sm);color:var(--text-primary);overflow-x:auto}
+.equation-desc{font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-3);padding-left:var(--space-2)}
+.exam-item{padding:var(--space-2) 0;font-size:var(--text-base);display:flex;gap:var(--space-2);align-items:flex-start;color:var(--text-secondary)}
+.term-table{width:100%;border-collapse:collapse}
+.term-table td{padding:var(--space-2) var(--space-3);font-size:var(--text-sm);border-bottom:1px solid var(--border-subtle)}
+.term-table td:first-child{font-weight:var(--weight-semibold);width:180px;color:var(--text-primary)}
+.term-table td:last-child{color:var(--text-secondary)}
+.transcript-collapsed{max-height:300px;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:var(--space-4);margin-top:var(--space-4);font-size:var(--text-sm);color:var(--text-secondary);line-height:var(--leading-relaxed)}
+.action-bar{display:flex;gap:var(--space-2);margin-top:var(--space-6)}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:var(--space-12) 0;text-align:center}
+.empty-state svg{width:48px;height:48px;opacity:0.15;margin-bottom:var(--space-4)}
+.empty-state .es-title{font-size:var(--text-lg);font-weight:var(--weight-semibold);color:var(--text-primary);margin-bottom:4px}
+.empty-state .es-desc{font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-5)}
+.placeholder-tab{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:var(--space-12) 0;text-align:center;color:var(--text-tertiary)}
+.placeholder-tab .pt-icon{font-size:32px;margin-bottom:var(--space-3);opacity:0.25}
+.placeholder-tab .pt-text{font-size:var(--text-sm)}
+/* tutor */
+.tutor-msg{display:flex;flex-direction:column;margin-bottom:var(--space-4)}
+.tutor-msg.user{align-items:flex-end}
+.tutor-msg.assistant{align-items:flex-start}
+.tutor-bubble{max-width:85%;padding:var(--space-3) var(--space-4);border-radius:var(--radius-lg);font-size:var(--text-sm);line-height:1.65;color:var(--text-primary)}
+.tutor-bubble.user{background:var(--bg-card);border-bottom-right-radius:4px}
+.tutor-bubble.assistant{background:var(--accent-muted);border-bottom-left-radius:4px}
+.tutor-label{font-size:var(--text-xs);color:var(--text-tertiary);margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<div id="titlebar"><span data-i18n="app.titlebar">AI 学习助手</span></div>
+
+<div id="body-wrap">
+
+<div id="sidebar">
+  <div class="logo" data-i18n="sidebar.logo">Monad</div>
+  <div class="sec-label" data-i18n="sidebar.sections.study">学习</div>
+  <div class="nav-item active" data-page="dashboard">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span data-i18n="sidebar.dashboard">仪表盘</span>
+  </div>
+  <div class="nav-item" data-page="courses">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span data-i18n="sidebar.courses">课程</span>
+  </div>
+
+  <div class="sec-label" data-i18n="sidebar.sections.ai">智能</div>
+  <div class="nav-item" data-page="tutor">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    <span data-i18n="sidebar.aiTutor">AI Tutor</span>
+  </div>
+
+  <div class="nav-item" data-page="review">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    <span>复习</span>
+  </div>
+  <div class="sec-label" data-i18n="sidebar.sections.system">系统</div>
+  <div class="nav-item" data-page="settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    <span data-i18n="sidebar.settings">设置</span>
+  </div>
+  <div class="user"><div class="avatar">S</div><span data-i18n="sidebar.user">Sebastian</span></div>
+</div>
+
+<div id="content-slot"></div>
+
+</div>
+
+<div id="statusbar">
+  <span style="display:flex;align-items:center;gap:6px"><span class="dot"></span><span data-i18n="statusbar.ready">模型就绪</span></span>
+  <span data-i18n="statusbar.model">DeepSeek V4</span>
+</div>
+
+<!-- ═══════════════════════ TEMPLATES ═══════════════════════ -->
+
+<template id="tpl-dashboard"><div class="page-view">
+  <div class="page-title" id="dbGreeting">下午好，Sebastian</div>
+  <div class="page-sub" id="dbSubtitle">今天有 2 门新课需要复习</div>
+  <div class="quick-grid">
+    <div class="quick-card" onclick="quickNewRecording()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      <span class="qc-title" data-i18n="dashboard.quickActions.newRecording">新录音</span>
+      <span class="qc-desc" data-i18n="dashboard.quickActions.newRecordingDesc">上传课堂录音</span>
+    </div>
+    <div class="quick-card" onclick="quickAskAI()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      <span class="qc-title" data-i18n="dashboard.quickActions.aiQuestion">AI 提问</span>
+      <span class="qc-desc" data-i18n="dashboard.quickActions.aiQuestionDesc">向 AI 提问</span>
+    </div>
+    <div class="quick-card" onclick="navigateTo('courses')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      <span class="qc-title" data-i18n="dashboard.quickActions.quickNote">快速笔记</span>
+      <span class="qc-desc" data-i18n="dashboard.quickActions.quickNoteDesc">手动记录想法</span>
+    </div>
+  </div>
+  <div class="two-col">
+    <div class="panel"><div class="panel-header" data-i18n="dashboard.recentCourses">最近课程</div><div id="recentCourses" style="color:var(--text-secondary);font-size:var(--text-sm)"></div></div>
+    <div class="panel"><div class="panel-header" data-i18n="dashboard.weeklyStats">本周统计</div><div id="weeklyStats" style="color:var(--text-secondary);font-size:var(--text-sm)"></div></div>
+  </div>
+  <div class="panel"><div class="panel-header" data-i18n="dashboard.recentNotes">最近笔记</div><div id="recentNotes" style="color:var(--text-tertiary);font-size:var(--text-sm)"></div></div>
+</div></template>
+
+<template id="tpl-courses"><div class="page-view">
+  <div class="page-title" data-i18n="courses.title">课程</div>
+  <div class="page-sub" id="coursesSubtitle" data-i18n="courses.subtitle">管理你的所有课程</div>
+  <div class="two-col" id="coursesGrid"></div>
+  <div class="panel hidden" id="createCourseForm" style="margin-top:var(--space-4)">
+    <div class="panel-header" data-i18n="courses.newCourse">新建课程</div>
+    <div style="display:flex;gap:var(--space-2);margin-top:var(--space-3)">
+      <input type="text" id="newCourseName" placeholder="课程名称，如：工程力学" style="flex:1;height:36px;padding:0 var(--space-3);background:var(--bg-input);border:1px solid var(--border-default);border-radius:var(--radius-sm);font-size:var(--text-sm);color:var(--text-primary);outline:none" onkeydown="if(event.key==='Enter')createCourse()"/>
+      <button class="btn-test" onclick="createCourse()" style="height:36px" data-i18n="courses.confirm">确认</button>
+      <button class="btn-test" onclick="hideCreateCourse()" style="height:36px" data-i18n="courses.cancel">取消</button>
+    </div>
+  </div>
+</div></template>
+
+<template id="tpl-course-detail"><div class="page-view">
+  <div class="back-link" onclick="navigateTo('courses')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    <span data-i18n="courseDetail.back">返回课程列表</span>
+  </div>
+  <div class="page-title" id="cdCourseName"></div><div class="page-sub" id="cdCourseMeta"></div>
+  <div class="tabs">
+    <div class="tab-item active" data-tab="lectures" onclick="switchTab('lectures')" data-i18n="courseDetail.tabs.lectures">课堂记录</div>
+    <div class="tab-item" data-tab="files" onclick="switchTab('files')">课程资料</div>
+    <div class="tab-item" data-tab="ai" onclick="switchTab('ai')">AI Tutor</div>
+  </div>
+  <div id="tab-lectures">
+    <div style="margin-bottom:var(--space-4)">
+      <button class="btn-secondary" onclick="uploadAudioInCourse()" style="height:36px">🎤 上传课堂录音</button>
+    </div>
+    <div class="lecture-list" id="lectureListInner"></div>
+  </div>
+  <div id="tab-files" class="hidden">
+    <div style="margin-bottom:var(--space-4)">
+      <button class="btn-secondary" onclick="uploadDocumentInCourse()" style="height:36px">+ 上传文档</button>
+    </div>
+    <div id="courseDocList" class="lecture-list"></div>
+  </div>
+  <div id="tab-ai" class="hidden">
+    <div style="margin-bottom:var(--space-4)">
+      <button class="btn-secondary" onclick="createTutorInCourse()" style="height:36px">+ 新建对话</button>
+    </div>
+    <div id="courseChatList" class="lecture-list"></div>
+  </div>
+</div></template>
+
+<template id="tpl-note"><div class="page-view">
+  <div class="back-link" id="noteBackLink" onclick="navigateTo('courses')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    <span data-i18n="note.back">返回</span>
+  </div>
+  <div class="page-title" id="noteTitle"></div><div class="page-sub" id="noteMeta"></div>
+  <div id="noteContent"></div>
+  <div class="action-bar">
+    <button class="btn-secondary" onclick="copyNote()" data-i18n="note.copyNote">复制笔记</button>
+    <button class="btn-secondary" onclick="exportNote()" data-i18n="note.exportMd">导出 Markdown</button>
+  </div>
+  <div style="margin-top:var(--space-6)">
+    <div style="font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:4px" onclick="toggleTranscript()">
+      <span id="transcriptToggleIcon">▸</span> <span data-i18n="note.transcript">原始转录文字</span>
+    </div>
+    <div class="transcript-collapsed hidden" id="transcriptBody"></div>
+  </div>
+</div></template>
+
+<template id="tpl-upload"><div class="page-view">
+  <div class="page-title" data-i18n="upload.title">录音分析</div>
+  <div class="step-label" data-i18n="upload.stepSelectCourse">选择课程</div>
+  <select class="upload-select" id="courseSelect"><option value="">-- 选择课程 --</option></select>
+  <div class="step-label" data-i18n="upload.stepSelectFile">选择录音文件</div>
+  <div class="upload-zone" id="uploadZone" onclick="selectAudioFile()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    <div class="uz-text" data-i18n="upload.uploadZone">点击选择音频文件</div>
+    <div class="uz-hint" data-i18n="upload.uploadHint">MP3 / M4A / WAV / FLAC · 最大 200MB</div>
+  </div>
+  <div class="file-info-card hidden" id="fileInfo">
+    <div><div class="fi-name" id="fileName"></div><div class="fi-meta" id="fileMeta"></div></div>
+    <span class="fi-remove" onclick="removeFile()" data-i18n="upload.removeFile">移除</span>
+  </div>
+  <button class="btn" id="startBtn" disabled onclick="startProcess()" data-i18n="upload.btnStartDisabled">选择课程和文件后开始</button>
+  <div class="progress-section hidden" id="progressSection">
+    <div class="progress-bar"><div class="fill" id="progressFill"></div></div>
+    <div class="progress-step" id="stepTranscribe"><span class="ps-icon ps-wait">&bull;</span> <span data-i18n="upload.progress.transcribing">语音转文字</span></div>
+    <div class="progress-step" id="stepNote"><span class="ps-icon ps-wait">&bull;</span> <span data-i18n="upload.progress.generating">生成课堂笔记</span></div>
+  </div>
+</div></template>
+
+<template id="tpl-review"><div class="page-view">
+  <div class="page-title">复习中心</div>
+  <div class="page-sub">基于 SM-2 间隔重复算法的智能复习系统</div>
+  <div class="two-col" style="margin-bottom:var(--space-6)">
+    <div class="panel">
+      <div class="panel-header">今日待复习</div>
+      <div id="reviewDueCount" style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--accent)">0</div>
+      <div style="font-size:var(--text-sm);color:var(--text-tertiary);margin-top:4px">道题目等待复习</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">总题库</div>
+      <div id="reviewTotalCount" style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--text-primary)">0</div>
+      <div style="font-size:var(--text-sm);color:var(--text-tertiary);margin-top:4px">道题目已生成</div>
+    </div>
+  </div>
+  <div class="panel" style="margin-bottom:var(--space-6)">
+    <div class="panel-header">记忆保留度 (Ebbinghaus)</div>
+    <div id="curveStats" style="display:flex;gap:var(--space-6);flex-wrap:wrap;margin-top:var(--space-3)">
+      <div><span style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--accent)" id="avgRetention">--</span><div style="font-size:var(--text-xs);color:var(--text-tertiary)">平均保留度</div></div>
+      <div><span style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--green)" id="masteredCount">--</span><div style="font-size:var(--text-xs);color:var(--text-tertiary)">已掌握</div></div>
+      <div><span style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--red)" id="needsReviewCount">--</span><div style="font-size:var(--text-xs);color:var(--text-tertiary)">需复习</div></div>
+      <div><span style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--text-primary)" id="avgStrength">--</span><div style="font-size:var(--text-xs);color:var(--text-tertiary)">平均记忆强度</div></div>
+    </div>
+    <div id="curveChart" style="margin-top:var(--space-4);height:120px;position:relative"></div>
+    <div id="curveList" style="margin-top:var(--space-4)"></div>
+  </div>
+  <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-6)">
+    <select class="lang-select" id="reviewCourseSelect" style="flex:1">
+      <option value="">选择课程</option>
+    </select>
+    <button class="btn-test" onclick="generateQuizzes()" style="height:36px;white-space:nowrap">生成测验题</button>
+    <button class="btn-test" onclick="startReview()" style="height:36px;white-space:nowrap">开始复习</button>
+  </div>
+  <div id="reviewStatus" class="status-msg" style="margin-bottom:var(--space-4)"></div>
+  <div id="reviewQuizArea"></div>
+  <div class="panel" style="margin-top:var(--space-6)">
+    <div class="panel-header">所有测验题</div>
+    <div id="reviewQuizList"></div>
+  </div>
+</div></template>
+
+<template id="tpl-settings"><div class="page-view">
+  <div class="page-title" data-i18n="settings.title">设置</div>
+  <div class="settings-card">
+    <div class="sc-title">AI Service</div>
+    <div class="settings-field-label" data-i18n="settings.api.label">DeepSeek API Key</div>
+    <div class="input-row">
+      <input type="password" id="deepseekKey" placeholder="sk-..."/>
+      <button class="btn-test" onclick="testDeepseek()" data-i18n="settings.test">测试</button>
+    </div>
+    <div class="status-msg" id="deepseekStatus"></div>
+  </div>
+  <div class="settings-card">
+    <div class="sc-title">Appearance</div>
+    <div class="settings-field-label" data-i18n="settings.language.label">语言</div>
+    <select class="lang-select" id="languageSelect" onchange="switchLanguage(this.value)">
+      <option value="en">English</option>
+      <option value="zh">简体中文</option>
+    </select>
+  </div>
+  <div class="settings-card">
+    <div class="sc-title">Speech-to-Text (Groq)</div>
+    <div class="settings-field-label">Groq API Key</div>
+    <div class="input-row">
+      <input type="password" id="groqKey" placeholder="gsk_..."/>
+      <button class="btn-test" onclick="testGroq()">测试</button>
+    </div>
+    <div class="status-msg" id="groqStatus"></div>
+  </div>
+  <button class="btn-save" onclick="saveSettings()" data-i18n="settings.save">保存设置</button>
+  <div class="status-msg" id="saveStatus" style="margin-top:var(--space-2)"></div>
+</div></template>
+
+<template id="tpl-knowledge"><div class="page-view">
+  <div class="page-title" data-i18n="knowledge.title">知识库</div>
+  <div class="page-sub" data-i18n="knowledge.subtitle">管理课程资料，上传 PDF/PPT 教材</div>
+  <div class="step-label" data-i18n="knowledge.selectCourse">选择课程</div>
+  <select class="upload-select" id="kbCourseSelect"><option value="">-- 选择课程 --</option></select>
+  <div class="upload-zone" id="kbUploadZone" onclick="selectDocumentFile()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    <div class="uz-text" data-i18n="knowledge.uploadZone">点击上传课程资料</div>
+    <div class="uz-hint" data-i18n="knowledge.uploadHint">PDF / PPT / TXT / MD</div>
+  </div>
+  <div class="file-info-card hidden" id="kbFileInfo">
+    <div><div class="fi-name" id="kbFileName"></div><div class="fi-meta" id="kbFileMeta"></div></div>
+    <button class="btn-test" onclick="uploadDocument()" style="height:32px" data-i18n="knowledge.uploadBtn">上传</button>
+  </div>
+  <div id="kbDocStatus" class="status-msg" style="margin-bottom:var(--space-4)"></div>
+  <div class="lecture-list" id="kbDocList">
+    <div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <div class="es-title" data-i18n="knowledge.empty.title">还没有课程资料</div>
+      <div class="es-desc" data-i18n="knowledge.empty.desc">上传教材 PDF/PPT 来增强笔记准确度</div>
+    </div>
+  </div>
+</div></template>
+
+<template id="tpl-tutor"><div class="page-view">
+  <div class="page-title">AI Tutor</div>
+  <div class="page-sub">基于课程资料的智能问答</div>
+  <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-6)">
+    <select class="lang-select" id="tutorCourseSelect" onchange="onTutorCourseChange()" style="flex:1">
+      <option value="">全部课程</option>
+    </select>
+    <select class="lang-select" id="tutorLectureSelect" onchange="onTutorLectureChange()" style="flex:1">
+      <option value="">整门课程</option>
+    </select>
+    <button class="btn-test" onclick="createTutorSession()" style="height:36px;white-space:nowrap">+ 新建</button>
+  </div>
+  <div style="display:flex;gap:var(--space-4)">
+  <div id="tutorHistory" style="width:180px;flex-shrink:0;max-height:55vh;overflow-y:auto"></div>
+  <div style="flex:1">
+  <div id="tutorMessages" style="margin-bottom:var(--space-4);max-height:55vh;overflow-y:auto;padding-right:4px">
+    <div class="empty-state" id="tutorEmpty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;opacity:0.2;margin-bottom:12px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      <div class="es-title">开始提问</div>
+      <div class="es-desc">新建对话后，向 AI 提问课程相关问题</div>
+    </div>
+  </div>
+  </div>
+  <div style="display:flex;gap:var(--space-2)">
+    <input type="text" id="tutorInput" placeholder="输入你的问题..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){sendTutorMessage();event.preventDefault()}" style="flex:1;height:40px;padding:0 var(--space-3);background:var(--bg-input);border:1px solid var(--border-default);border-radius:var(--radius-sm);font-size:var(--text-sm);color:var(--text-primary);outline:none"/>
+    <button class="btn" onclick="sendTutorMessage()" style="width:80px;height:40px">发送</button>
+  </div>
+  <div style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:var(--space-1)">Enter 发送 · Shift+Enter 换行</div>
+</div></template>
+
+
+<!-- ═══════════════════════ LOGIC ═══════════════════════ -->
+<script>
+var _currentPage = null;
+var _pageParams = {};
+
+function navigateTo(page, params) {
+  params = params || {};
+  if (page === _currentPage && Object.keys(params).length === 0) return;
+  var slot = document.getElementById('content-slot');
+  var tpl = document.getElementById('tpl-' + page);
+  if (!tpl) return;
+  _pageParams = params;
+  var cv = slot.querySelector('.page-view');
+  if (cv) { cv.classList.add('exiting'); setTimeout(function(){ slot.innerHTML = ''; mountPage(page, tpl); }, 100); }
+  else { mountPage(page, tpl); }
+}
+
+function mountPage(page, tpl) {
+  var slot = document.getElementById('content-slot'); slot.innerHTML = tpl.innerHTML;
+  document.querySelectorAll('#sidebar .nav-item').forEach(function(el){ el.classList.remove('active'); });
+  var ni = document.querySelector('#sidebar .nav-item[data-page="'+page+'"]'); if (ni) ni.classList.add('active');
+  if (page === 'course-detail' || page === 'note') { var cn = document.querySelector('#sidebar .nav-item[data-page="courses"]'); if (cn) cn.classList.add('active'); }
+  _currentPage = page;
+  var initMap = {
+    'dashboard': initDashboard, 'courses': initCourses, 'course-detail': initCourseDetail,
+    'note': initNote, 'settings': initSettings, 'tutor': initTutor, 'review': initReview
+  };
+  if (initMap[page]) initMap[page]();
+  if (i18n._loaded) i18n.applyTranslations();
+}
+
+document.querySelectorAll('#sidebar .nav-item:not(.disabled)').forEach(function(el){
+  el.addEventListener('click', function(){ navigateTo(this.dataset.page); });
+});
+
+// ── Language ──
+async function switchLanguage(lang) {
+  if (lang !== 'en' && lang !== 'zh') return;
+  localStorage.setItem('language', lang);
+  try { await eel.api_save_setting('language', lang)(); } catch(e) {}
+  location.reload();
+}
+
+// ── Dashboard ──
+function getGreeting() { var h = new Date().getHours(); if (h<12) return 'greeting_morning'; if (h<18) return 'greeting_afternoon'; return 'greeting_evening'; }
+async function initDashboard() {
+  var gw = i18n.t('dashboard.' + getGreeting());
+  var ge = document.getElementById('dbGreeting'), st = document.getElementById('dbSubtitle');
+  if (ge) { ge.textContent = i18n.t('dashboard.greeting_name', {greeting: gw}); ge.removeAttribute('data-i18n'); }
+  try {
+    var r = await eel.api_list_courses()();
+    var rc = document.getElementById('recentCourses');
+    if (r.success && r.courses.length > 0) {
+      if (st) { st.textContent = i18n.t('dashboard.subtitle', {count: r.courses.length}); st.removeAttribute('data-i18n'); }
+      var h = '';
+      for (var i = 0; i < r.courses.length && i < 3; i++) { var c = r.courses[i]; h += '<div class="course-row" onclick="navigateTo(\'course-detail\',{courseId:'+c.id+'})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>'+c.name+'</div>'; }
+      rc.innerHTML = h;
+    } else {
+      if (st) { st.textContent = i18n.t('dashboard.subtitle_none'); st.removeAttribute('data-i18n'); }
+      rc.innerHTML = '<div class="empty-block"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg><div class="eb-text">'+i18n.t('dashboard.empty.noCourses')+'</div></div>';
+    }
+  } catch(e) {}
+  var ws = document.getElementById('weeklyStats');
+  if (ws) ws.innerHTML = '<div class="empty-block"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><div class="eb-text">'+i18n.t('dashboard.stats_empty')+'</div></div>';
+  var rn = document.getElementById('recentNotes');
+  if (rn) rn.innerHTML = '<div class="empty-block"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div class="eb-text">'+i18n.t('dashboard.empty.noNotes')+'</div></div>';
+}
+
+// ── Dashboard Quick Actions ──
+async function quickNewRecording() {
+  var r = await eel.api_list_courses()();
+  if (!r.success || r.courses.length === 0) {
+    alert('请先创建一门课程');
+    navigateTo('courses');
+    return;
+  }
+  var courseNames = r.courses.map(function(c) { return c.id + ':' + c.name; });
+  var choice = prompt('选择课程:\n' + r.courses.map(function(c, i) { return (i+1) + '. ' + c.name; }).join('\n') + '\n\n输入序号:');
+  if (!choice) return;
+  var idx = parseInt(choice) - 1;
+  if (idx < 0 || idx >= r.courses.length) { alert('无效选择'); return; }
+  navigateTo('course-detail', {courseId: r.courses[idx].id});
+  setTimeout(function() { switchTab('lectures'); }, 300);
+}
+
+async function quickAskAI() {
+  navigateTo('tutor');
+  setTimeout(function() {
+    if (!_tutorSessionId) createTutorSession();
+  }, 300);
+}
+
+// ── Courses ──
+async function initCourses() {
+  try {
+    var r = await eel.api_list_courses()();
+    var grid = document.getElementById('coursesGrid'); if (!grid) return;
+    if (r.success && r.courses.length > 0) {
+      document.getElementById('coursesSubtitle').textContent = i18n.t('courses.subtitle_count', {count: r.courses.length});
+      var h = '';
+      for (var i = 0; i < r.courses.length; i++) { var c = r.courses[i]; h += '<div class="panel" style="cursor:pointer;transition:all var(--ease-normal)" onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'var(--shadow-md)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'\'" onclick="navigateTo(\'course-detail\',{courseId:'+c.id+'})"><div style="font-size:var(--text-lg);font-weight:var(--weight-semibold);margin-bottom:var(--space-2);color:var(--text-primary)">'+c.name+'</div><div style="font-size:var(--text-sm);color:var(--text-tertiary)">'+i18n.t('courses.createdAt',{date:c.created_at})+'</div></div>'; }
+      h += '<div class="panel" style="border:1.5px dashed rgba(255,255,255,0.10);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:100px;transition:all var(--ease-normal)" onmouseover="this.style.borderColor=\'var(--accent)\';this.style.background=\'var(--accent-muted)\'" onmouseout="this.style.borderColor=\'rgba(255,255,255,0.10)\';this.style.background=\'transparent\'" onclick="showCreateCourse()"><div style="text-align:center;color:var(--text-tertiary)"><div style="font-size:24px;margin-bottom:4px">+</div><div style="font-size:var(--text-sm)">'+i18n.t('courses.addCourse')+'</div></div></div>';
+      grid.innerHTML = h;
+    }
+  } catch(e) {}
+}
+function showCreateCourse() { var f = document.getElementById('createCourseForm'); if (f) { f.classList.remove('hidden'); setTimeout(function(){ var inp = document.getElementById('newCourseName'); if (inp) inp.focus(); }, 50); } }
+function hideCreateCourse() { var f = document.getElementById('createCourseForm'); if (f) f.classList.add('hidden'); }
+async function createCourse() { var inp = document.getElementById('newCourseName'); if (!inp || !inp.value.trim()) return; var r = await eel.api_create_course(inp.value.trim())(); if (r.success) { inp.value = ''; hideCreateCourse(); initCourses(); } else { alert(r.error); } }
+
+// ── Course Detail ──
+var _cdCourseId = null;
+async function initCourseDetail() { _cdCourseId = _pageParams.courseId; if (!_cdCourseId) { navigateTo('courses'); return; } var cr = await eel.api_get_course(_cdCourseId)(); if (!cr.success) { navigateTo('courses'); return; } document.getElementById('cdCourseName').textContent = cr.course.name; document.getElementById('cdCourseMeta').textContent = i18n.t('courseDetail.detail'); await loadLectures(); }
+async function loadLectures() {
+  var ct = document.getElementById('lectureListInner'); if (!ct) return;
+  var lr = await eel.api_get_lectures(_cdCourseId)();
+  if (!lr.success || !lr.lectures || lr.lectures.length === 0) { ct.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><div class="es-title">'+i18n.t('courseDetail.empty.title')+'</div><div class="es-desc">'+i18n.t('courseDetail.empty.desc')+'</div><button class="btn" style="width:auto;padding:0 24px" onclick="navigateTo(\'upload\')">'+i18n.t('courseDetail.empty.action')+'</button></div>'; return; }
+  var h = '';
+  for (var i = 0; i < lr.lectures.length; i++) { var l = lr.lectures[i]; var badge = l.has_note ? '<span class="lc-badge lc-badge-has-note">'+i18n.t('courseDetail.badge.hasNote')+'</span>' : '<span class="lc-badge lc-badge-no-note">'+i18n.t('courseDetail.badge.noNote')+'</span>'; h += '<div class="lecture-card" onclick="navigateTo(\'note\',{lectureId:'+l.id+'})"><div class="lc-header"><span class="lc-title">'+l.title+'</span>'+badge+'</div><div class="lc-meta">'+l.created_at+'</div></div>'; }
+  ct.innerHTML = h;
+  document.getElementById('cdCourseMeta').textContent = i18n.t('courseDetail.lectureCount', {count: lr.lectures.length});
+}
+
+async function loadCourseDocuments() {
+  var r = await eel.api_get_documents(_cdCourseId)();
+  var container = document.getElementById('courseDocList');
+  if (!container) return;
+  if (!r.success || !r.documents || r.documents.length === 0) {
+    container.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div class="es-title">还没有课程资料</div><div class="es-desc">点击上方按钮上传 PDF/PPT</div></div>';
+    return;
+  }
+  var h = '';
+  for (var i = 0; i < r.documents.length; i++) {
+    var d = r.documents[i];
+    var icon = d.file_type === '.pdf' ? '📄' : (d.file_type === '.pptx' || d.file_type === '.ppt' ? '📊' : '📝');
+    var chunks = d.chunk_count > 0 ? ' · ' + d.chunk_count + ' chunks' : '';
+    h += '<div class="lecture-card"><div class="lc-header"><span class="lc-title">' + icon + ' ' + d.filename + '</span><span class="fi-remove" style="cursor:pointer;color:var(--text-tertiary)" onclick="deleteDocumentInCourse(' + d.id + ')">删除</span></div><div class="lc-meta">' + d.created_at + chunks + '</div></div>';
+  }
+  container.innerHTML = h;
+}
+
+async function deleteDocumentInCourse(docId) {
+  if (!confirm('确认删除这个文档？')) return;
+  var r = await eel.api_delete_document(docId)();
+  if (r.success) loadCourseDocuments();
+  else alert(r.error || '删除失败');
+}
+
+async function uploadDocumentInCourse() {
+  var r = await eel.api_select_document_file()();
+  if (!r.success) return;
+  var btn = event.target;
+  var oldText = btn.textContent;
+  btn.disabled = true; btn.textContent = '上传中...';
+  var ur = await eel.api_upload_document(r.path, _cdCourseId)();
+  btn.disabled = false; btn.textContent = oldText;
+  if (ur.success) loadCourseDocuments();
+  else alert(ur.error || '上传失败');
+}
+
+async function loadCourseChatSessions() {
+  var r = await eel.api_get_chat_sessions(_cdCourseId)();
+  var container = document.getElementById('courseChatList');
+  if (!container) return;
+  if (!r.success || !r.sessions || r.sessions.length === 0) {
+    container.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><div class="es-title">还没有对话</div><div class="es-desc">点击上方按钮新建对话</div></div>';
+    return;
+  }
+  var h = '';
+  for (var i = 0; i < r.sessions.length; i++) {
+    var s = r.sessions[i];
+    h += '<div class="lecture-card" style="cursor:pointer" onclick="openTutorSession(' + s.id + ')"><div class="lc-header"><span class="lc-title">💬 ' + (s.title || '对话 #' + s.id) + '</span></div><div class="lc-meta">' + s.updated_at + '</div></div>';
+  }
+  container.innerHTML = h;
+}
+
+async function createTutorInCourse() {
+  var r = await eel.api_create_chat_session(_cdCourseId, null)();
+  if (r.success) {
+    navigateTo('tutor');
+    setTimeout(function() {
+      if (typeof _tutorSessionId !== 'undefined') _tutorSessionId = r.session.id;
+      if (typeof selectTutorSession === 'function') selectTutorSession(r.session.id);
+    }, 500);
+  }
+}
+
+async function openTutorSession(sessionId) {
+  navigateTo('tutor');
+  setTimeout(function() {
+    if (typeof selectTutorSession === 'function') selectTutorSession(sessionId);
+  }, 500);
+}
+
+async function uploadAudioInCourse() {
+  var r = await eel.api_select_audio_file()();
+  if (!r.success) return;
+  var btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '处理中...';
+  var copyResult = await eel.api_copy_audio(r.path, _cdCourseId)();
+  var tr = await eel.api_transcribe_audio(copyResult.path, _cdCourseId)();
+  if (!tr.success) {
+    btn.disabled = false;
+    btn.textContent = '🎤 上传课堂录音';
+    alert('转录失败: ' + tr.error);
+    return;
+  }
+  var nr = await eel.api_generate_note(tr.lecture_id)();
+  btn.disabled = false;
+  btn.textContent = '🎤 上传课堂录音';
+  if (nr.success) {
+    loadLectures();
+  } else {
+    alert('笔记生成失败: ' + nr.error);
+  }
+}
+function switchTab(tab) { document.querySelectorAll('.tab-item').forEach(function(t){ t.classList.remove('active'); }); var ti = document.querySelector('.tab-item[data-tab="'+tab+'"]'); if (ti) ti.classList.add('active'); var tl = document.getElementById('tab-lectures'), tf = document.getElementById('tab-files'), ta = document.getElementById('tab-ai'); if (tl) tl.classList.toggle('hidden', tab !== 'lectures'); if (tf) tf.classList.toggle('hidden', tab !== 'files'); if (ta) ta.classList.toggle('hidden', tab !== 'ai'); }
+
+// ── Note ──
+var _noteText = '';
+async function initNote() { var lid = _pageParams.lectureId; if (!lid) { navigateTo('courses'); return; } var r = await eel.api_get_lecture(lid)(); if (!r.success) { navigateTo('courses'); return; } var lec = r.lecture; document.getElementById('noteTitle').textContent = lec.title; document.getElementById('noteMeta').textContent = lec.created_at; document.getElementById('noteBackLink').onclick = function(){ navigateTo('course-detail',{courseId:lec.course_id}); }; if (!lec.note) { document.getElementById('noteContent').innerHTML = '<div class="empty-state"><div class="es-title">'+i18n.t('note.empty.title')+'</div><div class="es-desc">'+i18n.t('note.empty.desc')+'</div></div>'; document.getElementById('transcriptBody').classList.remove('hidden'); document.getElementById('transcriptBody').textContent = lec.transcript || ''; return; } _noteText = lec.note; document.getElementById('noteContent').innerHTML = parseNoteToHTML(lec.note); if (lec.transcript) document.getElementById('transcriptBody').textContent = lec.transcript; }
+function parseNoteToHTML(md) { var sects = [], cur = {title:'',lines:[]}; var lines = md.split('\n'); for (var i = 0; i < lines.length; i++) { var line = lines[i]; if (/^##\s/.test(line)) { if (cur.title||cur.lines.length>0) sects.push(cur); cur = {title:line.replace(/^##\s+/,'').trim(),lines:[]}; } else if (/^#\s/.test(line)) { if (cur.title||cur.lines.length>0) sects.push(cur); cur = {title:'',lines:[line]}; } else { cur.lines.push(line); } } if (cur.title||cur.lines.length>0) sects.push(cur); var html = ''; for (var s = 0; s < sects.length; s++) { var sec = sects[s], t = sec.title.toLowerCase(), b = sec.lines.filter(function(l){return l.trim()!=='';}); function kw(m){return t.indexOf(m)>=0;} if (kw('主题')||kw('topic')||kw('summary')||kw('总结')||kw('概括')) { html += '<div class="note-section"><div class="note-section-title">'+i18n.t('note.sections.summary')+'</div><div class="note-summary">'+b.join('<br>')+'</div></div>'; } else if (kw('知识点')||kw('knowledge')||kw('要点')) { html += '<div class="note-section"><div class="note-section-title">'+i18n.t('note.sections.keyConcepts')+'</div>'; for (var j = 0; j < b.length; j++) { var cl = b[j].replace(/^[-•*]\s*/,''); if (cl.trim()) html += '<div class="note-concept-item"><span class="nci-dot">&bull;</span><span>'+cl+'</span></div>'; } html += '</div>'; } else if (kw('公式')||kw('equation')||kw('formula')) { html += '<div class="note-section"><div class="note-section-title">'+i18n.t('note.sections.equations')+'</div>'; for (var j = 0; j < b.length; j++) { if (/^[-•*]\s*/.test(b[j])) html += '<div class="equation-block">'+b[j].replace(/^[-•*]\s*/,'')+'</div>'; else if (b[j].trim()) html += '<div class="equation-desc">'+b[j]+'</div>'; } html += '</div>'; } else if (kw('概念')||kw('concept')||kw('术语')||kw('term')) { html += '<div class="note-section"><div class="note-section-title">'+sec.title+'</div><table class="term-table">'; for (var j = 0; j < b.length; j++) { var pts = b[j].split(/[:：]/,2); if (pts.length===2) html += '<tr><td>'+pts[0].replace(/^[-•*]\s*/,'').trim()+'</td><td>'+pts[1].trim()+'</td></tr>'; else if (b[j].trim()) html += '<tr><td colspan="2">'+b[j].replace(/^[-•*]\s*/,'')+'</td></tr>'; } html += '</table></div>'; } else if (kw('考试')||kw('exam')||kw('重点')||kw('focus')) { html += '<div class="note-section"><div class="note-section-title">'+i18n.t('note.sections.examFocus')+'</div>'; for (var j = 0; j < b.length; j++) { var cl = b[j].replace(/^[-•*]\s*/,''); if (!cl.trim()) continue; var ic = '📌'; if (cl.indexOf('必考')>=0||cl.indexOf('⭐')>=0) ic='⭐'; if (cl.indexOf('易错')>=0||cl.indexOf('⚠')>=0) ic='⚠️'; html += '<div class="exam-item"><span class="ei-icon">'+ic+'</span><span>'+cl+'</span></div>'; } html += '</div>'; } else if (t===''&&b.length>0&&b[0].startsWith('# ')) { html += '<div style="font-size:var(--text-lg);font-weight:var(--weight-semibold);margin-bottom:var(--space-4);color:var(--text-primary)">'+b[0].replace(/^#\s+/,'')+'</div>'; } else if (b.length>0) { html += '<div class="note-section"><div class="note-section-title">'+(sec.title||i18n.t('note.sections.notes'))+'</div><div style="line-height:var(--leading-relaxed);color:var(--text-secondary)">'+b.join('<br>')+'</div></div>'; } } return html || '<div style="line-height:var(--leading-relaxed);color:var(--text-secondary)">'+md.replace(/\n/g,'<br>')+'</div>'; }
+function toggleTranscript() { var b = document.getElementById('transcriptBody'), ic = document.getElementById('transcriptToggleIcon'); if (!b||!ic) return; b.classList.toggle('hidden'); ic.textContent = b.classList.contains('hidden')?'▸':'▾'; }
+async function copyNote() { if (_noteText) { await navigator.clipboard.writeText(_noteText); var btn = document.querySelector('.action-bar .btn-secondary'); if (btn) { var o = btn.textContent; btn.textContent = i18n.t('note.copied'); btn.style.color='var(--green)'; setTimeout(function(){ btn.textContent=o; btn.style.color=''; },1500); } } }
+function exportNote() { if (!_noteText) return; var b = new Blob([_noteText],{type:'text/markdown'}); var u = URL.createObjectURL(b); var a = document.createElement('a'); a.href=u; a.download='note_'+new Date().toISOString().slice(0,10)+'.md'; a.click(); URL.revokeObjectURL(u); }
+
+// ── Knowledge Base ──
+var _kbFilePath = null;
+var _kbCourseId = null;
+async function initKnowledge() {
+  _kbFilePath = null; _kbCourseId = null;
+  document.getElementById('kbUploadZone').classList.remove('hidden');
+  document.getElementById('kbFileInfo').classList.add('hidden');
+  document.getElementById('kbDocStatus').textContent = '';
+  document.getElementById('kbDocStatus').className = 'status-msg';
+  var r = await eel.api_list_courses()();
+  var s = document.getElementById('kbCourseSelect'); if (!s) return;
+  if (r.courses.length === 0) { s.innerHTML = '<option value="">-- 请先创建课程 --</option>'; return; }
+  var h = '<option value="">-- 选择课程 --</option>';
+  for (var i = 0; i < r.courses.length; i++) h += '<option value="'+r.courses[i].id+'">'+r.courses[i].name+'</option>';
+  s.innerHTML = h;
+  s.onchange = function() { _kbCourseId = this.value ? parseInt(this.value) : null; if (_kbCourseId) loadDocuments(_kbCourseId); };
+}
+async function selectDocumentFile() {
+  var r = await eel.api_select_document_file()(); if (!r.success) return;
+  _kbFilePath = r.path;
+  document.getElementById('kbUploadZone').classList.add('hidden');
+  document.getElementById('kbFileInfo').classList.remove('hidden');
+  document.getElementById('kbFileName').textContent = r.info.filename;
+  document.getElementById('kbFileMeta').textContent = r.info.size_mb + ' MB · ' + r.info.format;
+}
+// Eel callback for background indexing progress
+function update_index_progress(docId, status, info) {
+  var st = document.getElementById('kbDocStatus');
+  if (!st) return;
+  if (status === 'indexing') {
+    st.textContent = '正在建立向量索引...'; st.className = 'status-msg';
+  } else if (status === 'done') {
+    st.textContent = '索引完成 (' + info + ' chunks)'; st.className = 'status-msg ok';
+    if (_kbCourseId) loadDocuments(_kbCourseId);
+  } else if (status === 'no_key') {
+    st.textContent = '已保存，但未配置 API Key，跳过索引'; st.className = 'status-msg';
+  } else if (status === 'error') {
+    st.textContent = '索引失败: ' + info; st.className = 'status-msg fail';
+  }
+}
+eel.expose(update_index_progress);
+
+async function uploadDocument() {
+  if (!_kbFilePath || !_kbCourseId) return;
+  var st = document.getElementById('kbDocStatus'); st.textContent = i18n.t('knowledge.parsing'); st.className = 'status-msg';
+  var r = await eel.api_upload_document(_kbFilePath, _kbCourseId)();
+  if (r.success) {
+    st.textContent = '已保存，正在后台建立索引...'; st.className = 'status-msg';
+    _kbFilePath = null;
+    document.getElementById('kbUploadZone').classList.remove('hidden');
+    document.getElementById('kbFileInfo').classList.add('hidden');
+    loadDocuments(_kbCourseId);
+  } else { st.textContent = r.error; st.className = 'status-msg fail'; }
+}
+async function loadDocuments(courseId) {
+  var r = await eel.api_get_documents(courseId)();
+  var container = document.getElementById('kbDocList');
+  if (!r.success || !r.documents || r.documents.length === 0) {
+    container.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div class="es-title" data-i18n="knowledge.empty.title">还没有课程资料</div><div class="es-desc" data-i18n="knowledge.empty.desc">上传教材 PDF/PPT 来增强笔记准确度</div></div>';
+    return;
+  }
+  var h = '';
+  for (var i = 0; i < r.documents.length; i++) {
+    var d = r.documents[i];
+    var icon = d.file_type === '.pdf' ? '📄' : (d.file_type === '.pptx' || d.file_type === '.ppt' ? '📊' : '📝');
+    var chunks = d.chunk_count > 0 ? ' · '+d.chunk_count+' chunks' : '';
+    h += '<div class="lecture-card"><div class="lc-header"><span class="lc-title">'+icon+' '+d.filename+'</span><span class="fi-remove" style="cursor:pointer;color:var(--text-tertiary)" onclick="deleteDocument('+d.id+','+courseId+')">删除</span></div><div class="lc-meta">'+d.created_at+chunks+'</div></div>';
+  }
+  container.innerHTML = h;
+}
+async function deleteDocument(docId, courseId) {
+  if (!confirm('确认删除这个文档？')) return;
+  var r = await eel.api_delete_document(docId)();
+  if (r.success) loadDocuments(courseId);
+  else alert(r.error || '删除失败');
+}
+
+// ── AI Tutor ──
+var _tutorSessionId = null;
+var _tutorStreamBuffer = '';
+var _tutorStreamEl = null;
+var _tutorPendingSources = [];
+
+// Eel callback for multi-agent streaming
+function start_agent_stream(agentType, diagnosis, sources) {
+  _tutorStreamBuffer = '';
+  _tutorPendingSources = sources || [];
+  var msgs = document.getElementById('tutorMessages');
+
+  // Agent 标识
+  var agentLabels = {
+    'explanation': '📖 讲解 Agent',
+    'quiz': '✏️ 出题 Agent',
+    'correction': '⚠️ 纠错 Agent'
+  };
+  var label = agentLabels[agentType] || '🧠 AI Tutor';
+
+  // 诊断信息
+  var diagHtml = '';
+  if (diagnosis && diagnosis.weak_points && diagnosis.weak_points.length > 0) {
+    diagHtml = '<div style="font-size:10px;color:var(--text-tertiary);margin-bottom:2px">💡 识别薄弱: ' + diagnosis.weak_points.join(', ') + '</div>';
+  }
+
+  msgs.insertAdjacentHTML('beforeend', '<div class="tutor-msg assistant" id="_tutorStreaming"><div class="tutor-label">' + label + '</div>' + diagHtml + '<div class="tutor-bubble assistant" id="_tutorStreamBubble"></div></div>');
+  _tutorStreamEl = document.getElementById('_tutorStreamBubble');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+eel.expose(start_agent_stream);
+
+// Eel callbacks (Python -> JS)
+function start_tutor_stream(sources) {
+  _tutorStreamBuffer = '';
+  _tutorPendingSources = sources || [];
+  var msgs = document.getElementById('tutorMessages');
+  msgs.insertAdjacentHTML('beforeend', '<div class="tutor-msg assistant" id="_tutorStreaming"><div class="tutor-label">AI Tutor</div><div class="tutor-bubble assistant" id="_tutorStreamBubble"></div></div>');
+  _tutorStreamEl = document.getElementById('_tutorStreamBubble');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+eel.expose(start_tutor_stream);
+
+function update_tutor_stream(chunk) {
+  if (_tutorStreamEl) {
+    _tutorStreamBuffer += chunk;
+    _tutorStreamEl.innerHTML = _tutorStreamBuffer.replace(/\n/g,'<br>');
+    var msgs = document.getElementById('tutorMessages');
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+}
+eel.expose(update_tutor_stream);
+
+function end_tutor_stream() {
+  if (_tutorStreamEl) {
+    var sourcesHtml = '';
+    if (_tutorPendingSources.length > 0) {
+      sourcesHtml = '<div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.08);font-size:11px;color:var(--text-tertiary);display:flex;flex-wrap:wrap;gap:6px;align-items:center;"><span>📖 参考资料</span>';
+      for (var si = 0; si < _tutorPendingSources.length; si++) {
+        var src = _tutorPendingSources[si];
+        var tag = src.source || '文档';
+        if (src.page) tag += ' P.' + src.page;
+        sourcesHtml += '<span style="background:rgba(129,140,248,0.15);padding:2px 8px;border-radius:4px;">' + tag + '</span>';
+      }
+      sourcesHtml += '</div>';
+    }
+    _tutorStreamEl.insertAdjacentHTML('beforeend', sourcesHtml);
+    _tutorStreamEl = null;
+    _tutorStreamBuffer = '';
+    _tutorPendingSources = [];
+  }
+}
+eel.expose(end_tutor_stream);
+
+async function initTutor() {
+  _tutorSessionId = null;
+  document.getElementById('tutorMessages').innerHTML = '<div class="empty-state" id="tutorEmpty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;opacity:0.2;margin-bottom:12px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><div class="es-title">开始提问</div><div class="es-desc">新建对话或选择历史会话</div></div>';
+  document.getElementById('tutorInput').value = '';
+  var r = await eel.api_list_courses()();
+  var s = document.getElementById('tutorCourseSelect'); if (!s) return;
+  var h = '<option value="">全部课程</option>';
+  for (var i = 0; i < r.courses.length; i++) h += '<option value="'+r.courses[i].id+'">'+r.courses[i].name+'</option>';
+  s.innerHTML = h;
+  // Load chat history
+  await loadTutorHistory();
+}
+async function loadTutorHistory() {
+  try {
+    var r = await eel.api_get_chat_sessions(null)();
+    var historyBar = document.getElementById('tutorHistory');
+    if (!historyBar) return;
+    if (!r.success || !r.sessions || r.sessions.length === 0) {
+      historyBar.innerHTML = '';
+      return;
+    }
+    var h = '';
+    for (var i = 0; i < r.sessions.length; i++) {
+      var s = r.sessions[i];
+      var title = s.title || ('会话 #' + s.id);
+      h += '<div class="lecture-card" style="padding:var(--space-2) var(--space-3);cursor:pointer;margin-bottom:4px" onclick="selectTutorSession('+s.id+')"><div style="font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--text-primary)">'+title+'</div><div style="font-size:var(--text-xs);color:var(--text-tertiary)">'+s.updated_at+'</div></div>';
+    }
+    historyBar.innerHTML = h;
+  } catch(e) {}
+}
+async function selectTutorSession(sessionId) {
+  _tutorSessionId = sessionId;
+  var r = await eel.api_get_chat_messages(sessionId)();
+  var msgs = document.getElementById('tutorMessages');
+  if (!r.success || !r.messages) { msgs.innerHTML = ''; return; }
+  var h = '';
+  for (var i = 0; i < r.messages.length; i++) {
+    var m = r.messages[i];
+    var label = m.role === 'user' ? '你' : 'AI Tutor';
+    var cls = m.role === 'user' ? 'user' : 'assistant';
+    h += '<div class="tutor-msg '+cls+'"><div class="tutor-label">'+label+'</div><div class="tutor-bubble '+cls+'">'+m.content.replace(/\n/g,'<br>')+'</div></div>';
+  }
+  msgs.innerHTML = h;
+  msgs.scrollTop = msgs.scrollHeight;
+}
+async function onTutorCourseChange() {
+  var cid = document.getElementById('tutorCourseSelect').value;
+  var ls = document.getElementById('tutorLectureSelect');
+  if (!cid) { ls.innerHTML = '<option value="">整门课程</option>'; return; }
+  var r = await eel.api_get_lectures(parseInt(cid))();
+  var h = '<option value="">整门课程</option>';
+  if (r.lectures) for (var i = 0; i < r.lectures.length; i++) h += '<option value="'+r.lectures[i].id+'">'+r.lectures[i].title+'</option>';
+  ls.innerHTML = h;
+}
+function onTutorLectureChange() {}
+async function createTutorSession() {
+  var cid = document.getElementById('tutorCourseSelect').value || null;
+  var lid = document.getElementById('tutorLectureSelect').value || null;
+  var r = await eel.api_create_chat_session(cid ? parseInt(cid) : null, lid ? parseInt(lid) : null)();
+  if (r.success) {
+    _tutorSessionId = r.session.id;
+    document.getElementById('tutorMessages').innerHTML = '';
+    document.getElementById('tutorInput').focus();
+  }
+}
+async function sendTutorMessage() {
+  var input = document.getElementById('tutorInput');
+  var msg = input.value.trim(); if (!msg) return;
+  if (!_tutorSessionId) { await createTutorSession(); if (!_tutorSessionId) return; }
+  var msgs = document.getElementById('tutorMessages');
+  var empty = document.getElementById('tutorEmpty'); if (empty) empty.remove();
+  msgs.insertAdjacentHTML('beforeend', '<div class="tutor-msg user"><div class="tutor-label">你</div><div class="tutor-bubble user">'+msg+'</div></div>');
+  input.value = ''; msgs.scrollTop = msgs.scrollHeight;
+  // Streaming happens via eel callbacks
+  var r = await eel.api_tutor_chat(_tutorSessionId, msg)();
+  if (!r.success) {
+    msgs.insertAdjacentHTML('beforeend', '<div class="tutor-msg assistant"><div class="tutor-label">AI Tutor</div><div class="tutor-bubble assistant" style="color:var(--red)">❌ '+r.error+'</div></div>');
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+  // Refresh history after each message
+  await loadTutorHistory();
+}
+
+// ── Upload ──
+var _selectedFilePath = null;
+async function initUpload() {
+  _selectedFilePath = null;
+  document.getElementById('uploadZone').classList.remove('hidden');
+  document.getElementById('fileInfo').classList.add('hidden');
+  var btn = document.getElementById('startBtn');
+  if (btn) { btn.disabled = true; btn.textContent = i18n.t('upload.btnStartDisabled'); }
+  var ps = document.getElementById('progressSection');
+  if (ps) { ps.classList.add('hidden'); var nb = ps.querySelector('.note-box'); if (nb) nb.remove(); }
+  var r = await eel.api_list_courses()();
+  var s = document.getElementById('courseSelect'); if (!s) return;
+  if (r.courses.length === 0) { s.innerHTML = '<option value="">'+i18n.t('upload.selectNoCourses')+'</option>'; return; }
+  var h = '<option value="">'+i18n.t('upload.selectPlaceholder')+'</option>';
+  for (var i = 0; i < r.courses.length; i++) h += '<option value="'+r.courses[i].id+'">'+r.courses[i].name+'</option>';
+  s.innerHTML = h;
+  s.onchange = checkUploadReady;
+  // Check for ongoing background task
+  try {
+    var task = await eel.api_get_task_status()();
+    if (task && task.status === 'running') {
+      if (ps) ps.classList.remove('hidden');
+      var ts = document.getElementById('stepTranscribe');
+      if (ts) ts.innerHTML = '<span class="ps-icon ps-active">&bull;</span> <span>'+i18n.t('upload.progress.transcribingActive')+'</span>';
+      var fill = document.getElementById('progressFill');
+      if (fill) fill.style.width = '30%';
+      if (btn) { btn.disabled = true; btn.textContent = i18n.t('upload.btnProcessing'); }
+    } else if (task && task.status === 'done') {
+      // Task completed while away — show result
+      if (ps) ps.classList.remove('hidden');
+      var ts2 = document.getElementById('stepTranscribe');
+      if (ts2) ts2.innerHTML = '<span class="ps-icon ps-done">&bull;</span> <span>'+i18n.t('upload.progress.transcribingDone')+'</span>';
+      var ns2 = document.getElementById('stepNote');
+      if (ns2) ns2.innerHTML = '<span class="ps-icon ps-done">&bull;</span> <span>'+i18n.t('upload.progress.generatingDone')+'</span>';
+      var fill2 = document.getElementById('progressFill');
+      if (fill2) fill2.style.width = '100%';
+      if (btn) btn.textContent = i18n.t('upload.btnDone');
+      var lid = task.lecture_id;
+      ps.insertAdjacentHTML('beforeend', '<div class="note-box"><h3>'+i18n.t('upload.noteBoxTitle')+'</h3><div style="color:var(--green);margin-bottom:8px">✅ 转录完成（笔记未生成，请重新上传生成）</div><button class="btn-secondary" style="margin-top:12px" onclick="navigateTo(\'note\',{lectureId:'+lid+'})">查看转录</button></div>');
+      await eel.api_clear_task_status()();
+    } else if (task && task.status === 'error') {
+      if (ps) ps.classList.remove('hidden');
+      var ts3 = document.getElementById('stepTranscribe');
+      if (ts3) ts3.innerHTML = '<span class="ps-icon" style="color:var(--red)">&bull;</span> '+i18n.t('upload.progress.transcribingFailed')+'：'+task.error;
+      if (btn) { btn.textContent = i18n.t('upload.btnFailed'); btn.disabled = false; }
+      await eel.api_clear_task_status()();
+    }
+  } catch(e) {}
+}
+function checkUploadReady() { var cid = document.getElementById('courseSelect') ? document.getElementById('courseSelect').value : ''; var btn = document.getElementById('startBtn'); if (!btn) return; if (cid && _selectedFilePath) { btn.disabled = false; btn.textContent = i18n.t('upload.btnStart'); } else { btn.disabled = true; btn.textContent = i18n.t('upload.btnStartDisabled'); } }
+async function selectAudioFile() { var r = await eel.api_select_audio_file()(); if (!r.success) return; _selectedFilePath = r.path; document.getElementById('uploadZone').classList.add('hidden'); document.getElementById('fileInfo').classList.remove('hidden'); document.getElementById('fileName').textContent = r.info.filename; document.getElementById('fileMeta').textContent = r.info.size_mb + ' MB · ' + r.info.format; checkUploadReady(); }
+function removeFile() { _selectedFilePath = null; document.getElementById('uploadZone').classList.remove('hidden'); document.getElementById('fileInfo').classList.add('hidden'); checkUploadReady(); }
+// Eel callback for note streaming
+var _noteStreamBuffer = '';
+var _noteStreamEl = null;
+function start_note_stream() {
+  _noteStreamBuffer = '';
+  var ps = document.getElementById('progressSection');
+  if (ps) { var ob = ps.querySelector('.note-box'); if (ob) ob.remove(); }
+  ps.insertAdjacentHTML('beforeend', '<div class="note-box"><h3>'+i18n.t('upload.noteBoxTitle')+'</h3><div id="_noteStreamContent"></div></div>');
+  _noteStreamEl = document.getElementById('_noteStreamContent');
+}
+eel.expose(start_note_stream);
+function update_note_stream(chunk) {
+  if (_noteStreamEl) {
+    _noteStreamBuffer += chunk;
+    _noteStreamEl.innerHTML = _noteStreamBuffer.replace(/\n/g,'<br>');
+  }
+}
+eel.expose(update_note_stream);
+function end_note_stream() {
+  if (_noteStreamEl) {
+    var lid = _noteStreamEl.getAttribute('data-lid');
+    if (lid) {
+      _noteStreamEl.insertAdjacentHTML('beforeend', '<button class="btn-secondary" style="margin-top:12px" onclick="navigateTo(\'note\',{lectureId:'+lid+'})">'+i18n.t('upload.viewFullNote')+'</button>');
+    }
+    _noteStreamEl = null;
+    _noteStreamBuffer = '';
+  }
+}
+eel.expose(end_note_stream);
+
+// Polling for background transcription progress
+async function pollTranscribeStatus() {
+  return new Promise(function(resolve) {
+    var timer = setInterval(async function() {
+      try {
+        var task = await eel.api_get_task_status()();
+        if (!task) { clearInterval(timer); resolve(null); return; }
+        if (task.status === 'done') {
+          clearInterval(timer);
+          await eel.api_clear_task_status()();
+          resolve({lecture_id: task.lecture_id, transcript: task.transcript});
+        } else if (task.status === 'error') {
+          clearInterval(timer);
+          await eel.api_clear_task_status()();
+          resolve(null);
+          var ts = document.getElementById('stepTranscribe');
+          var btn = document.getElementById('startBtn');
+          if (ts) ts.innerHTML = '<span class="ps-icon" style="color:var(--red)">&bull;</span> '+i18n.t('upload.progress.transcribingFailed')+'：'+task.error;
+          if (btn) { btn.textContent = i18n.t('upload.btnFailed'); btn.disabled = false; }
+        }
+      } catch(e) {}
+    }, 2000);
+  });
+}
+
+async function startProcess() {
+  var cid = parseInt(document.getElementById('courseSelect').value);
+  if (!cid || !_selectedFilePath) return;
+  var btn = document.getElementById('startBtn');
+  if (btn) { btn.disabled = true; btn.textContent = i18n.t('upload.btnProcessing'); }
+  var ps = document.getElementById('progressSection');
+  if (ps) ps.classList.remove('hidden');
+  var copyResult = await eel.api_copy_audio(_selectedFilePath, cid)();
+  var ts = document.getElementById('stepTranscribe');
+  if (ts) ts.innerHTML = '<span class="ps-icon ps-active">&bull;</span> <span>'+i18n.t('upload.progress.transcribingActive')+'</span>';
+  var fill = document.getElementById('progressFill');
+  if (fill) fill.style.width = '30%';
+  // Start background transcription
+  await eel.api_transcribe_audio(copyResult.path, cid)();
+  // Poll for result
+  var tr = await pollTranscribeStatus();
+  if (!tr) return;
+  var lid = tr.lecture_id;
+  var ns = document.getElementById('stepNote');
+  if (ns) ns.innerHTML = '<span class="ps-icon ps-active">&bull;</span> <span>'+i18n.t('upload.progress.generatingActive')+'</span>';
+  // Set lid on stream element for the "view full note" button
+  var streamEl = document.getElementById('_noteStreamContent');
+  if (streamEl) streamEl.setAttribute('data-lid', lid);
+  // Streaming happens via eel callbacks during api_generate_note
+  var nr = await eel.api_generate_note(lid)();
+  if (!nr.success) { if (ns) ns.innerHTML = '<span class="ps-icon" style="color:var(--red)">&bull;</span> '+i18n.t('upload.progress.generatingFailed')+'：'+nr.error; if (btn) { btn.textContent = i18n.t('upload.btnFailed'); btn.disabled = false; } return; }
+  if (ns) ns.innerHTML = '<span class="ps-icon ps-done">&bull;</span> <span>'+i18n.t('upload.progress.generatingDone')+'</span>';
+  if (fill) fill.style.width = '100%';
+  if (btn) btn.textContent = i18n.t('upload.btnDone');
+  _selectedFilePath = null;
+  document.getElementById('uploadZone').classList.remove('hidden');
+  document.getElementById('fileInfo').classList.add('hidden');
+  if (btn) { btn.disabled = true; btn.textContent = i18n.t('upload.btnStartDisabled'); }
+}
+
+// ── Review & Quiz ──
+var _reviewQueue = [];
+var _reviewIndex = 0;
+var _reviewAnswers = {};
+
+async function initReview() {
+  _reviewQueue = [];
+  _reviewIndex = 0;
+  _reviewAnswers = {};
+  document.getElementById('reviewQuizArea').innerHTML = '';
+  document.getElementById('reviewStatus').textContent = '';
+  var r = await eel.api_list_courses()();
+  var s = document.getElementById('reviewCourseSelect');
+  if (!s) return;
+  var h = '<option value="">选择课程</option>';
+  for (var i = 0; i < r.courses.length; i++) h += '<option value="'+r.courses[i].id+'">'+r.courses[i].name+'</option>';
+  s.innerHTML = h;
+  await refreshReviewStats();
+  await loadQuizList();
+  await loadCurveStats();
+}
+
+async function refreshReviewStats() {
+  var cid = document.getElementById('reviewCourseSelect').value || null;
+  var r = await eel.api_get_review_stats(cid)();
+  if (r.success) {
+    document.getElementById('reviewDueCount').textContent = r.stats.due_today;
+    document.getElementById('reviewTotalCount').textContent = r.stats.total;
+  }
+}
+
+async function loadCurveStats() {
+  var cid = document.getElementById('reviewCourseSelect').value || null;
+  try {
+    var r = await eel.api_get_curve_stats(cid)();
+    if (r.success && r.stats.total > 0) {
+      document.getElementById('avgRetention').textContent = (r.stats.avg_retention * 100).toFixed(0) + '%';
+      document.getElementById('masteredCount').textContent = r.stats.mastered;
+      document.getElementById('needsReviewCount').textContent = r.stats.needs_review;
+      document.getElementById('avgStrength').textContent = r.stats.avg_strength.toFixed(1);
+    } else {
+      document.getElementById('avgRetention').textContent = '--';
+      document.getElementById('masteredCount').textContent = '0';
+      document.getElementById('needsReviewCount').textContent = '0';
+      document.getElementById('avgStrength').textContent = '--';
+    }
+    await loadCurveList(cid);
+  } catch(e) {}
+}
+
+async function loadCurveList(cid) {
+  try {
+    var r = await eel.api_get_forgetting_curves(cid)();
+    var container = document.getElementById('curveList');
+    if (!container) return;
+    if (!r.success || !r.curves || r.curves.length === 0) {
+      container.innerHTML = '<div style="color:var(--text-tertiary);font-size:var(--text-sm);text-align:center;padding:var(--space-4)">暂无记忆数据，完成复习后这里会显示遗忘曲线</div>';
+      return;
+    }
+    var h = '';
+    for (var i = 0; i < r.curves.length; i++) {
+      var c = r.curves[i];
+      var pct = (c.current_retention * 100).toFixed(0);
+      var barColor = c.current_retention >= 0.7 ? 'var(--green)' : (c.current_retention >= 0.4 ? 'var(--accent)' : 'var(--red)');
+      var statusIcon = c.needs_review ? '🔴' : '🟢';
+      h += '<div class="lecture-card" style="margin-bottom:8px;cursor:pointer" onclick="showCurveChart('+c.review_id+')">';
+      h += '<div class="lc-header"><span class="lc-title" style="font-size:var(--text-sm)">'+statusIcon+' '+c.question.substring(0,40)+(c.question.length>40?'...':'')+'</span>';
+      h += '<span style="font-size:var(--text-xs);color:var(--text-tertiary)">S='+c.memory_strength.toFixed(1)+'</span></div>';
+      h += '<div style="display:flex;align-items:center;gap:var(--space-2);margin-top:6px">';
+      h += '<div style="flex:1;height:6px;background:var(--bg-input);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+barColor+';border-radius:3px;transition:width 300ms"></div></div>';
+      h += '<span style="font-size:var(--text-xs);color:var(--text-tertiary);min-width:36px;text-align:right">'+pct+'%</span>';
+      h += '</div></div>';
+    }
+    container.innerHTML = h;
+  } catch(e) {}
+}
+
+async function showCurveChart(reviewId) {
+  try {
+    var r = await eel.api_get_curve_chart(reviewId)();
+    if (!r.success) return;
+    var data = r.data;
+    var chart = document.getElementById('curveChart');
+    if (!chart) return;
+
+    // Simple CSS bar chart
+    var h = '<div style="display:flex;align-items:flex-end;gap:2px;height:100%;padding:0 4px">';
+    for (var i = 0; i < data.chart_data.length; i++) {
+      var d = data.chart_data[i];
+      var height = Math.max(2, d.retention * 100);
+      var color = d.is_today ? 'var(--accent)' : (d.is_threshold ? 'var(--red)' : 'var(--accent-muted)');
+      var opacity = d.is_today ? 1.0 : 0.4 + d.retention * 0.4;
+      h += '<div style="flex:1;height:'+height+'%;background:'+color+';opacity:'+opacity+';border-radius:2px 2px 0 0;min-width:4px" title="Day '+d.day+': '+(d.retention*100).toFixed(0)+'%"></div>';
+    }
+    h += '</div>';
+    h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-xs);color:var(--text-tertiary);margin-top:4px"><span>Day 0</span><span style="color:var(--accent)">Now: Day '+data.current_day+' ('+(data.current_retention*100).toFixed(0)+'%)</span><span>Day 30</span></div>';
+
+    chart.innerHTML = h;
+  } catch(e) {}
+}
+
+async function loadQuizList() {
+  var cid = document.getElementById('reviewCourseSelect').value;
+  if (!cid) { document.getElementById('reviewQuizList').innerHTML = '<div style="color:var(--text-tertiary);font-size:var(--text-sm)">请选择课程</div>'; return; }
+  var r = await eel.api_get_quizzes(parseInt(cid))();
+  var container = document.getElementById('reviewQuizList');
+  if (!r.success || !r.quizzes || r.quizzes.length === 0) {
+    container.innerHTML = '<div class="empty-block"><div class="eb-text">还没有测验题，点击"生成测验题"开始</div></div>';
+    return;
+  }
+  var h = '';
+  for (var i = 0; i < r.quizzes.length; i++) {
+    var q = r.quizzes[i];
+    var typeIcon = q.options ? '选择题' : '填空题';
+    var diffColor = q.difficulty === 'easy' ? 'var(--green)' : (q.difficulty === 'hard' ? 'var(--red)' : 'var(--accent)');
+    h += '<div class="lecture-card" style="margin-bottom:8px"><div class="lc-header"><span class="lc-title" style="font-size:var(--text-sm)">'+typeIcon+' · '+q.question.substring(0,50)+(q.question.length>50?'...':'')+'</span><span class="fi-remove" style="cursor:pointer" onclick="deleteQuiz('+q.id+')">删除</span></div><div style="font-size:var(--text-xs);color:'+diffColor+'">'+q.difficulty+' · '+q.created_at+'</div></div>';
+  }
+  container.innerHTML = h;
+}
+
+async function generateQuizzes() {
+  var cid = document.getElementById('reviewCourseSelect').value;
+  if (!cid) { alert('请先选择课程'); return; }
+  var st = document.getElementById('reviewStatus');
+  st.textContent = '正在生成测验题...'; st.className = 'status-msg';
+  var r = await eel.api_generate_quizzes(parseInt(cid))();
+  if (r.success) {
+    st.textContent = '生成了 ' + r.count + ' 道测验题'; st.className = 'status-msg ok';
+    await refreshReviewStats();
+    await loadQuizList();
+  } else {
+    st.textContent = r.error; st.className = 'status-msg fail';
+  }
+}
+
+async function startReview() {
+  var cid = document.getElementById('reviewCourseSelect').value || null;
+  var st = document.getElementById('reviewStatus');
+  var r = await eel.api_get_due_reviews(cid)();
+  if (!r.success || !r.reviews || r.reviews.length === 0) {
+    st.textContent = '今日没有需要复习的题目';
+    st.className = 'status-msg';
+    document.getElementById('reviewQuizArea').innerHTML = '';
+    return;
+  }
+  _reviewQueue = r.reviews;
+  _reviewIndex = 0;
+  _reviewAnswers = {};
+  st.textContent = '';
+  renderReviewQuestion();
+}
+
+function renderReviewQuestion() {
+  if (_reviewIndex >= _reviewQueue.length) { renderReviewSummary(); return; }
+  var q = _reviewQueue[_reviewIndex];
+  var area = document.getElementById('reviewQuizArea');
+  var html = '<div class="panel">';
+  html += '<div style="display:flex;justify-content:space-between;margin-bottom:var(--space-4)">';
+  html += '<span style="font-size:var(--text-sm);color:var(--text-tertiary)">第 ' + (_reviewIndex+1) + ' / ' + _reviewQueue.length + ' 题</span>';
+  html += '<span style="font-size:var(--text-xs);color:var(--accent)">' + q.difficulty + '</span>';
+  html += '</div>';
+  html += '<div style="font-size:var(--text-base);font-weight:var(--weight-semibold);margin-bottom:var(--space-4);color:var(--text-primary)">' + q.question + '</div>';
+  
+  if (q.options) {
+    for (var i = 0; i < q.options.length; i++) {
+      var letter = String.fromCharCode(65 + i);
+      html += '<div class="lecture-card" style="margin-bottom:8px;cursor:pointer" onclick="selectAnswer(' + i + ')">';
+      html += '<div style="display:flex;gap:var(--space-2)">';
+      html += '<span style="font-weight:var(--weight-bold);color:var(--accent)">' + letter + '</span>';
+      html += '<span>' + q.options[i] + '</span>';
+      html += '</div></div>';
+    }
+  } else {
+    html += '<input type="text" id="fillBlankInput" placeholder="输入你的答案..." style="width:100%;height:40px;padding:0 var(--space-3);background:var(--bg-input);border:1px solid var(--border-default);border-radius:var(--radius-sm);font-size:var(--text-sm);color:var(--text-primary);outline:none;margin-bottom:var(--space-4)" onkeydown="if(event.keyCode===13)submitFillBlank()"/>';
+    html += '<button class="btn-secondary" onclick="submitFillBlank()" style="margin-top:var(--space-2)">提交答案</button>';
+  }
+  html += '<div id="reviewFeedback" style="margin-top:var(--space-4)"></div>';
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+function selectAnswer(optionIndex) {
+  var q = _reviewQueue[_reviewIndex];
+  var userAnswer = String.fromCharCode(65 + optionIndex);
+  var correct = (userAnswer === q.answer);
+  _reviewAnswers[_reviewIndex] = { user: userAnswer, correct: correct };
+  showFeedback(correct, q);
+}
+
+function submitFillBlank() {
+  var q = _reviewQueue[_reviewIndex];
+  var input = document.getElementById('fillBlankInput');
+  if (!input || !input.value.trim()) return;
+  var userAnswer = input.value.trim();
+  var correct = (userAnswer === q.answer || userAnswer.toLowerCase() === q.answer.toLowerCase());
+  _reviewAnswers[_reviewIndex] = { user: userAnswer, correct: correct };
+  showFeedback(correct, q);
+}
+
+function showFeedback(correct, q) {
+  var fb = document.getElementById('reviewFeedback');
+  var html = '<div style="padding:var(--space-4);border-radius:var(--radius-md);background:';
+  html += correct ? 'rgba(52,211,153,0.10)' : 'rgba(248,113,113,0.10)';
+  html += ';margin-top:var(--space-3)';
+  html += '<div style="font-weight:var(--weight-semibold);color:';
+  html += correct ? 'var(--green)' : 'var(--red)';
+  html += ';margin-bottom:var(--space-2)">' + (correct ? '✅ 正确' : '❌ 错误') + '</div>';
+  html += '<div style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-2)">正确答案: ' + q.answer + '</div>';
+  if (q.explanation) {
+    html += '<div style="font-size:var(--text-sm);color:var(--text-tertiary)">' + q.explanation + '</div>';
+  }
+  html += '<div style="margin-top:var(--space-4);font-size:var(--text-sm);color:var(--text-tertiary)">你对这道题的掌握程度?</div>';
+  html += '<div style="display:flex;gap:var(--space-2);margin-top:var(--space-2)">';
+  html += '<button class="btn-secondary" style="flex:1" onclick="rateQuality(0)">完全不会</button>';
+  html += '<button class="btn-secondary" style="flex:1" onclick="rateQuality(3)">有印象</button>';
+  html += '<button class="btn-secondary" style="flex:1" onclick="rateQuality(4)">想起来了</button>';
+  html += '<button class="btn-secondary" style="flex:1" onclick="rateQuality(5)">很简单</button>';
+  html += '</div></div>';
+  fb.innerHTML = html;
+}
+
+async function rateQuality(quality) {
+  var q = _reviewQueue[_reviewIndex];
+  await eel.api_submit_review(q.review_id, quality)();
+  _reviewIndex++;
+  renderReviewQuestion();
+  refreshReviewStats();
+}
+
+function renderReviewSummary() {
+  var correct = 0;
+  for (var k in _reviewAnswers) { if (_reviewAnswers[k].correct) correct++; }
+  var total = _reviewQueue.length;
+  var pct = Math.round(correct / total * 100);
+  var area = document.getElementById('reviewQuizArea');
+  var html = '<div class="panel" style="text-align:center">';
+  html += '<div style="font-size:48px;margin-bottom:var(--space-4)">' + (pct>=80?'🎉':(pct>=60?'👍':'💪')) + '</div>';
+  html += '<div style="font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--text-primary);margin-bottom:var(--space-2)">' + correct + ' / ' + total + ' 正确</div>';
+  html += '<div style="font-size:var(--text-sm);color:var(--text-tertiary)">正确率 ' + pct + '% · 下次复习时间已根据 SM-2 算法自动安排</div>';
+  html += '<button class="btn-secondary" style="margin-top:var(--space-5)" onclick="initReview()">返回</button>';
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+async function deleteQuiz(quizId) {
+  if (!confirm('确认删除这道测验题？')) return;
+  await eel.api_delete_quiz(quizId)();
+  await refreshReviewStats();
+  await loadQuizList();
+}
+
+// ── Settings ──
+async function initSettings() { var k = await eel.api_get_setting('deepseek_key')(); var el = document.getElementById('deepseekKey'); if (el && k) el.value = k; var gk = await eel.api_get_setting('groq_key')(); var gel = document.getElementById('groqKey'); if (gel && gk) gel.value = gk; var ls = document.getElementById('languageSelect'); if (ls) ls.value = i18n.getLanguage(); }
+async function testDeepseek() { var k = document.getElementById('deepseekKey') ? document.getElementById('deepseekKey').value.trim() : ''; if (!k) return; var el = document.getElementById('deepseekStatus'); if (!el) return; el.textContent = i18n.t('settings.testing'); el.className = 'status-msg'; var r = await eel.api_test_key('deepseek', k)(); if (r.success) { el.textContent = i18n.t('settings.testSuccess'); el.className = 'status-msg ok'; } else { el.textContent = i18n.t('settings.testFailed'); el.className = 'status-msg fail'; } }
+async function testGroq() { var k = document.getElementById('groqKey') ? document.getElementById('groqKey').value.trim() : ''; if (!k) return; var el = document.getElementById('groqStatus'); if (!el) return; el.textContent = '测试中...'; el.className = 'status-msg'; var r = await eel.api_test_key('groq', k)(); if (r.success) { el.textContent = '连接成功'; el.className = 'status-msg ok'; } else { el.textContent = '连接失败'; el.className = 'status-msg fail'; } }
+async function saveSettings() { var k = document.getElementById('deepseekKey') ? document.getElementById('deepseekKey').value.trim() : ''; if (k) await eel.api_save_setting('deepseek_key', k)(); var gk = document.getElementById('groqKey') ? document.getElementById('groqKey').value.trim() : ''; if (gk) await eel.api_save_setting('groq_key', gk)(); var el = document.getElementById('saveStatus'); if (el) { el.textContent = i18n.t('settings.saved'); el.className = 'status-msg ok'; } var btn = document.querySelector('.btn-save'); if (btn) { var o = btn.textContent; btn.textContent = i18n.t('settings.saved'); btn.style.background = 'var(--green)'; setTimeout(function(){ btn.textContent = o; btn.style.background = ''; }, 1500); } }
+
+// ── Boot ──
+(async function boot() { await i18n.init(); navigateTo('dashboard'); })();
+</script>
+</body>
+</html>

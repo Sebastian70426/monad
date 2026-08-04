@@ -1,0 +1,65 @@
+/* ═══ Monad Design Tokens — Apple × AI Future ═══ */
+:root {
+  /* ── 背景阶梯（深空蓝黑） ── */
+  --bg-window:     #080B14;
+  --bg-sidebar:    rgba(10, 13, 22, 0.82);
+  --bg-surface:    #0E1119;
+  --bg-card:       #131722;
+  --bg-card-lift:  #171C29;
+  --bg-input:      rgba(255,255,255,0.05);
+  --bg-overlay:    rgba(4,6,12,0.6);
+
+  /* ── 文字 4 级 ── */
+  --text-primary:   #F5F7FF;
+  --text-secondary: #9AA3B8;
+  --text-tertiary:  #5D667D;
+  --text-disabled:  #343C52;
+
+  /* ── 品牌三色渐变（全局唯一焦点） ── */
+  --accent:       #7C8CFF;
+  --accent-2:     #A78BFA;
+  --accent-3:     #22D3EE;
+  --gradient-brand: linear-gradient(135deg,#7C8CFF,#A78BFA 55%,#22D3EE);
+  --accent-muted:   rgba(124,140,255,0.12);
+  --accent-glow:    0 0 20px rgba(124,140,255,0.35);
+
+  /* ── 语义色 ── */
+  --green: #34D399;  --green-muted: rgba(52,211,153,0.12);
+  --amber: #FBBF24;  --amber-muted: rgba(251,191,36,0.12);
+  --red:   #F87171;  --red-muted:   rgba(248,113,113,0.12);
+
+  /* ── 边框 ── */
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-default: rgba(255,255,255,0.10);
+  --border-strong:  rgba(255,255,255,0.16);
+
+  /* ── 几何锁（全站唯一值） ── */
+  --gap:    24px;
+  --radius: 16px;
+  --pad:    24px;
+
+  /* ── 阴影 ── */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.35);
+  --shadow-lg: 0 24px 60px rgba(0,0,0,0.6);
+
+  /* ── 动画 ── */
+  --ease-out:   cubic-bezier(0.22,1,0.36,1);
+  --ease-spring: cubic-bezier(0.34,1.56,0.64,1);
+  --dur-fast: 150ms;
+  --dur-base: 220ms;
+  --dur-slow: 360ms;
+
+  /* ── 字体 ── */
+  --font-sans: 'Inter','SF Pro Display',-apple-system,BlinkMacSystemFont,
+               'PingFang SC','HarmonyOS Sans SC','Noto Sans SC','Microsoft YaHei',sans-serif;
+  --font-mono: 'JetBrains Mono','SF Mono','Fira Code',Consolas,monospace;
+
+  /* ── 字号 ── */
+  --text-xs:11px; --text-sm:13px; --text-base:14px;
+  --text-lg:16px; --text-xl:20px; --text-2xl:24px; --text-3xl:30px;
+
+  /* ── 布局 ── */
+  --sidebar-w: 240px;
+  --topbar-h:  60px;
+}

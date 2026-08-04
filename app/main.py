@@ -127,7 +127,8 @@ def generate_note_with_rag_stream(transcript, course_name, api_key, rag_context=
 # ========== 初始化 ==========
 
 init_db()
-eel.init('web')
+import os as _os
+eel.init(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'web'))
 
 # 后台任务状态跟踪（内存中，重启丢失）
 _bg_tasks = {}
@@ -145,9 +146,36 @@ def api_create_course(name):
 
 
 @eel.expose
-def api_list_courses():
-    courses = course_repo.get_all()
+def api_list_courses(include_archived=False):
+    courses = course_repo.get_all(include_archived=include_archived)
     return {"success": True, "courses": courses}
+
+
+@eel.expose
+def api_rename_course(course_id, new_name):
+    """重命名课程"""
+    name = (new_name or '').strip()
+    if not name:
+        return {"success": False, "error": "课程名称不能为空"}
+    existing = course_repo.get_by_name(name)
+    if existing and existing['id'] != int(course_id):
+        return {"success": False, "error": "课程已存在"}
+    course_repo.rename(int(course_id), name)
+    return {"success": True}
+
+
+@eel.expose
+def api_archive_course(course_id):
+    """归档课程（数据保留，从首页隐藏）"""
+    course_repo.set_archived(int(course_id), True)
+    return {"success": True}
+
+
+@eel.expose
+def api_unarchive_course(course_id):
+    """取消归档"""
+    course_repo.set_archived(int(course_id), False)
+    return {"success": True}
 
 
 @eel.expose
@@ -160,13 +188,43 @@ def api_get_course(course_id):
 
 @eel.expose
 def api_delete_course(course_id):
-    lecture_repo.delete_by_course(course_id)
-    document_repo.delete_by_course(course_id)
-    course_repo.delete(course_id)
+    """删除课程及其所有关联数据（单事务级联删除，顺序严格：先子表后父表）"""
+    from db import get_db
+
+    # 1. 清理 ChromaDB 向量集合（独立于 SQL）
+    try:
+        from services.rag_service import _get_client
+        docs = document_repo.get_meta_by_course(course_id)
+        client = _get_client()
+        for d in docs:
+            try:
+                client.delete_collection("doc_%d" % d['id'])
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # 2. SQL 级联删除（单事务：任一失败则整体回滚）
+    with get_db() as conn:
+        # 对话消息 → 会话
+        conn.execute("DELETE FROM chat_messages WHERE session_id IN (SELECT id FROM chat_sessions WHERE course_id = ?)", (course_id,))
+        conn.execute("DELETE FROM chat_sessions WHERE course_id = ?", (course_id,))
+        # 知识点关联 → 依赖 → 掌握度 → 知识点
+        conn.execute("DELETE FROM quiz_knowledge_points WHERE point_id IN (SELECT id FROM knowledge_points WHERE course_id = ?)", (course_id,))
+        conn.execute("DELETE FROM knowledge_dependencies WHERE point_id IN (SELECT id FROM knowledge_points WHERE course_id = ?) OR depends_on_id IN (SELECT id FROM knowledge_points WHERE course_id = ?)", (course_id, course_id))
+        conn.execute("DELETE FROM knowledge_mastery WHERE point_id IN (SELECT id FROM knowledge_points WHERE course_id = ?)", (course_id,))
+        conn.execute("DELETE FROM knowledge_points WHERE course_id = ?", (course_id,))
+        # 复习记录 → 测验
+        conn.execute("DELETE FROM reviews WHERE quiz_id IN (SELECT id FROM quizzes WHERE course_id = ?)", (course_id,))
+        conn.execute("DELETE FROM quizzes WHERE course_id = ?", (course_id,))
+        # 课堂记录 / 课程资料
+        conn.execute("DELETE FROM lectures WHERE course_id = ?", (course_id,))
+        conn.execute("DELETE FROM documents WHERE course_id = ?", (course_id,))
+        # 课程本体
+        conn.execute("DELETE FROM courses WHERE id = ?", (course_id,))
+
     return {"success": True}
 
-
-# ========== 文件选择 ==========
 
 @eel.expose
 def api_select_audio_file():
@@ -626,5 +684,72 @@ def api_link_quizzes_to_knowledge(course_id):
     return {"success": True, "linked": linked, "total": len(quizzes)}
 
 
+# ========== Knowledge Search & Reindex ==========
+
+def _doc_size_mb(doc):
+    import os
+    try:
+        p = doc.get('file_path') or ''
+        if p:
+            return round(os.path.getsize(p) / (1024 * 1024), 2)
+    except Exception:
+        pass
+    return 0
+
+
+@eel.expose
+def api_search_documents(course_id, query):
+    """知识库搜索：文件名匹配 + RAG 语义检索。course_id 为空表示全部课程"""
+    from services.rag_service import retrieve_with_metadata
+    q = (query or '').strip()
+    docs = document_repo.get_meta_with_path_by_course(int(course_id)) if course_id else document_repo.get_all_meta_with_path()
+    results = []
+    for d in docs:
+        match = 'none'
+        if q and q.lower() in (d.get('filename') or '').lower():
+            match = 'filename'
+        results.append({
+            'id': d['id'], 'course_id': d['course_id'], 'filename': d['filename'],
+            'file_type': d['file_type'], 'chunk_count': d['chunk_count'],
+            'created_at': d['created_at'], 'size_mb': _doc_size_mb(d),
+            'match': match, 'snippets': []
+        })
+    if q and len(q) >= 2:
+        try:
+            indexed_ids = [d['id'] for d in docs if (d.get('chunk_count') or 0) > 0]
+            if indexed_ids:
+                res = retrieve_with_metadata(indexed_ids, q, top_k=8)
+                for s in res.get('sources', []):
+                    src = s.get('source')
+                    for r in results:
+                        if r['filename'] == src:
+                            r['match'] = 'semantic'
+                            snip = (s.get('text') or '')[:100]
+                            if snip and snip not in r['snippets']:
+                                r['snippets'].append(snip)
+                            break
+        except Exception as e:
+            print(f"知识库语义检索失败: {e}")
+    rank = {'semantic': 0, 'filename': 1, 'none': 2}
+    results.sort(key=lambda x: (rank.get(x['match'], 2), x['created_at']))
+    return {"success": True, "results": results, "query": q}
+
+
+@eel.expose
+def api_reindex_document(doc_id):
+    """重新索引文档：重新提取文本 + 重建向量"""
+    from services.document_service import extract_structured
+    doc = document_repo.get_by_id(int(doc_id))
+    if not doc:
+        return {"success": False, "error": "文档不存在"}
+    try:
+        sections = extract_structured(doc['file_path'], doc['file_type'], doc['filename'])
+        chunk_count = index_document(doc['id'], sections)
+        document_repo.update_chunk_count(doc['id'], chunk_count)
+        return {"success": True, "chunk_count": chunk_count}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 if __name__ == '__main__':
-    eel.start('index.html', size=(1100, 750), port=8080)
+    eel.start('index.html', size=(1440, 900), port=8080)

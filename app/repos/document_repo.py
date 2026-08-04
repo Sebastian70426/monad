@@ -58,3 +58,20 @@ def delete_by_course(course_id):
     """删除某课程下所有文档（级联删除用）"""
     execute("DELETE FROM documents WHERE course_id = ?", (course_id,))
     return True
+
+
+def get_meta_with_path_by_course(course_id):
+    """获取某课程下所有文档元数据（含 file_path，用于显示文件大小）"""
+    return query(
+        "SELECT id, course_id, filename, file_path, file_type, chunk_count, created_at "
+        "FROM documents WHERE course_id = ? ORDER BY created_at DESC",
+        (course_id,)
+    )
+
+
+def get_all_meta_with_path():
+    """获取所有文档元数据（含 file_path）"""
+    return query(
+        "SELECT id, course_id, filename, file_path, file_type, chunk_count, created_at "
+        "FROM documents ORDER BY created_at DESC"
+    )
