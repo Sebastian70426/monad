@@ -127,8 +127,13 @@ def generate_note_with_rag_stream(transcript, course_name, api_key, rag_context=
 # ========== 初始化 ==========
 
 init_db()
-import os as _os
-eel.init(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'web'))
+import os as _os, sys as _sys
+# PyInstaller 打包后资源在 sys._MEIPASS，开发时用 __file__
+if hasattr(_sys, '_MEIPASS'):
+    _web_dir = _os.path.join(_sys._MEIPASS, 'app', 'web')
+else:
+    _web_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'web')
+eel.init(_web_dir)
 
 # 后台任务状态跟踪（内存中，重启丢失）
 _bg_tasks = {}

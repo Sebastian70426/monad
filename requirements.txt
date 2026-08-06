@@ -18,4 +18,5 @@ sentence-transformers
 
 # ===== 文档解析 =====
 PyMuPDF
-python-pptxgroq
+python-pptx
+groq
