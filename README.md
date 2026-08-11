@@ -7,11 +7,14 @@ An AI-powered learning assistant for university students. Upload lecture recordi
 - 🎤 **Lecture Analysis** — Upload classroom recordings → speech-to-text → AI-generated structured notes
 - 📚 **Course Management** — Organize lecture notes by course, review historical notes anytime
 - 📝 **Structured Notes** — Summary / Key Concepts / Equations / Exam Focus / Terminology
-- 📖 **Knowledge Base** — Upload PDF/PPT/TXT with two-stage RAG retrieval (vector recall + cross-encoder reranking)
-- 🧠 **AI Tutor** — Streaming responses with source citations (page numbers)
+- 📖 **Knowledge Base** — Upload PDF/PPT/TXT/images with two-stage RAG retrieval (vector recall + cross-encoder reranking); image documents (textbook photos, whiteboard shots) are auto-extracted with vision models
+- 🧠 **AI Tutor** — Streaming responses with source citations (page numbers); attach images (up to 3) for multimodal models
+- 🤖 **Multiple Model Providers** — DeepSeek / OpenAI (ChatGPT) / Groq / Google Gemini, switchable in Settings with one-click connection test
+- 🖼️ **Multimodal** — GPT-4o / Gemini can see and answer: chat images, image documents, knowledge graph over course materials
 - 🔄 **Spaced Repetition** — SM-2 algorithm schedules review sessions based on student performance
-- 🌍 **Bilingual** — UI supports English / Simplified Chinese
+- 🌍 **Trilingual UI** — Simplified Chinese / English / Japanese, switchable anytime
 - 🌙 **Dark Mode** — Indigo + Zinc color scheme
+- ✂️ **Copyable Content** — Notes, chat history, transcripts and quizzes are selectable and copyable
 
 ## 🚀 Quick Start
 
@@ -31,10 +34,13 @@ An AI-powered learning assistant for university students. Upload lecture recordi
 
 ### API Key Configuration
 
-Open the app → go to **Settings**, configure two API keys:
+Open the app → go to **Settings**, choose your model provider and configure keys:
 
-1. **DeepSeek API Key** (for AI Q&A and note generation)
-   - Register at https://platform.deepseek.com/
+1. **LLM Provider** (for AI Q&A, notes, quizzes and knowledge extraction) — select one:
+   - **DeepSeek** — register at https://platform.deepseek.com/
+   - **OpenAI (ChatGPT)** — https://platform.openai.com/ (supports images)
+   - **Groq** — https://console.groq.com/
+   - **Google Gemini** — https://aistudio.google.com/apikey (supports images)
    - Enter key → click "Test" → green "Connected" → "Save"
 
 2. **Groq API Key** (for speech-to-text)
@@ -45,7 +51,7 @@ Open the app → go to **Settings**, configure two API keys:
 
 **Translate Documents:**
 1. Courses → Create a course
-2. Knowledge Base → Select course → Upload PDF/PPT/TXT
+2. Knowledge Base → Select course → Upload PDF/PPT/TXT/images
 3. AI Tutor → New session → Type "Please translate the full text"
 
 **Lecture Recording → Notes:**
