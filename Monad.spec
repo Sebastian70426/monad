@@ -21,6 +21,7 @@ a = Analysis(
         'eel', 'eel.browsers',
         'openai', 'chromadb',
         'sentence_transformers', 'fitz', 'pptx', 'groq',
+        'google', 'google.genai',
         'PIL', 'numpy', 'torch', 'transformers', 'tokenizers',
     ],
     hookspath=[],
