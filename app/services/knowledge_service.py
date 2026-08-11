@@ -1,7 +1,7 @@
 import json
 import logging
-from openai import OpenAI
-from repos import knowledge_repo, lecture_repo, quiz_repo
+from services.llm_client import get_llm_client
+from repos import knowledge_repo, lecture_repo, quiz_repo, document_repo
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +29,8 @@ EXTRACT_PROMPT = """你是一位知识图谱专家。请从以下课程笔记中
 """
 
 
-def extract_knowledge_points(course_id, api_key):
-    """从课程笔记中提取知识点图谱
+def extract_knowledge_points(course_id):
+    """从课程笔记 + 课程资料（含图片提取文字）中提取知识点图谱
 
     返回: {"success": True, "points": N, "dependencies": N}
     """
@@ -43,14 +43,21 @@ def extract_knowledge_points(course_id, api_key):
             if full and full.get('note'):
                 notes.append(full['note'])
 
-    if not notes:
-        return {"success": False, "error": "课程中没有笔记,无法提取知识点"}
+    # 补充课程资料内容（含图片文档经视觉模型提取的文字），使图谱覆盖文档
+    doc_texts = []
+    for d in document_repo.get_meta_by_course(course_id):
+        full = document_repo.get_by_id(d['id'])
+        if full and full.get('content'):
+            doc_texts.append(full['content'][:3000])
 
-    content = "\n\n---\n\n".join(notes)[:6000]
+    if not notes and not doc_texts:
+        return {"success": False, "error": "课程中没有笔记或资料,无法提取知识点"}
+
+    content = "\n\n---\n\n".join(notes + doc_texts)[:6000]
 
     # 调用 LLM
     try:
-        raw = _call_llm(content, api_key)
+        raw = _call_llm(content)
         result = _parse_result(raw)
     except Exception as e:
         logger.warning(f"LLM 提取知识点失败: {e}", exc_info=True)
@@ -88,7 +95,7 @@ def extract_knowledge_points(course_id, api_key):
     }
 
 
-def link_quiz_to_knowledge(quiz_id, course_id, api_key):
+def link_quiz_to_knowledge(quiz_id, course_id):
     """将测验题关联到知识点（用 LLM 判断题目涉及哪些知识点）"""
     quiz = quiz_repo.get_quiz_by_id(quiz_id)
     if not quiz:
@@ -109,15 +116,12 @@ def link_quiz_to_knowledge(quiz_id, course_id, api_key):
 只返回 JSON 数组,包含知识点名称,如: ["牛顿第二定律"]
 如果都不相关,返回: []"""
 
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-    response = client.chat.completions.create(
-        model="deepseek-v4-flash",
+    client = get_llm_client()
+    raw = client.chat(
         messages=[{"role": "system", "content": prompt}, {"role": "user", "content": quiz['question']}],
         temperature=0,
         max_tokens=100
     )
-
-    raw = response.choices[0].message.content.strip()
     try:
         names = json.loads(raw)
     except json.JSONDecodeError:
@@ -141,12 +145,10 @@ def link_quiz_to_knowledge(quiz_id, course_id, api_key):
     return {"success": True, "linked": linked}
 
 
-def _call_llm(content, api_key):
-    """调用 DeepSeek API 提取知识点"""
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-
-    response = client.chat.completions.create(
-        model="deepseek-v4-flash",
+def _call_llm(content):
+    """调用当前配置的模型提供商提取知识点"""
+    client = get_llm_client()
+    return client.chat(
         messages=[
             {"role": "system", "content": EXTRACT_PROMPT},
             {"role": "user", "content": content}
@@ -154,8 +156,6 @@ def _call_llm(content, api_key):
         temperature=0.3,
         max_tokens=2000
     )
-
-    return response.choices[0].message.content
 
 
 def _parse_result(raw_text):

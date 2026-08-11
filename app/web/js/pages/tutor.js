@@ -6,8 +6,8 @@ UI.register('tutor', async (slot) => {
       <!-- 零状态：问候置顶 -->
       <div class="tutor-zero" id="tutorZero">
         <div class="tutor-wrap">
-          <div style="font-size:30px;font-weight:700;letter-spacing:-0.02em;color:var(--text-primary);line-height:1.4">今天想探索什么？</div>
-          <div style="font-size:13.5px;color:var(--text-tertiary);margin-top:12px">从一门课程、一个概念，或一道题开始 —— 你的 AI 助教随时待命</div>
+          <div style="font-size:30px;font-weight:700;letter-spacing:-0.02em;color:var(--text-primary);line-height:1.4">${T('tut.hero')}</div>
+          <div style="font-size:13.5px;color:var(--text-tertiary);margin-top:12px">${T('tut.heroSub')}</div>
         </div>
       </div>
 
@@ -20,7 +20,7 @@ UI.register('tutor', async (slot) => {
       <div class="tutor-ctxline" id="tutorCtxLine" style="display:none">
         <div class="tutor-wrap" style="display:flex;align-items:center;justify-content:center">
           <span class="ctx-dropdown" id="ctxDropdown" onclick="UI.togglePopover('context', this)" style="font-size:11.5px">
-            <span id="ctxLabel">🌍 全局知识库</span>
+            <span id="ctxLabel">${T('tut.globalKB')}</span>
             <span style="opacity:0.6;font-size:9px">▾</span>
           </span>
         </div>
@@ -31,16 +31,20 @@ UI.register('tutor', async (slot) => {
         <div class="tutor-wrap">
           <div class="tutor-tools">
             <div class="tutor-chips">
-              <span class="chip-pill" onclick="UI.tutorChip('简化一下')">简化</span>
-              <span class="chip-pill" onclick="UI.tutorChip('出一个例题')">例题</span>
-              <span class="chip-pill" onclick="UI.tutorChip('出一道测验题')">出题</span>
-              <span class="chip-pill" onclick="UI.tutorChip('用类比解释')">类比</span>
+              <span class="chip-pill" onclick="UI.tutorChip('${T('tut.chipSimplify')}')">${T('tut.chipSimplify')}</span>
+              <span class="chip-pill" onclick="UI.tutorChip('${T('tut.chipExample')}')">${T('tut.chipExample')}</span>
+              <span class="chip-pill" onclick="UI.tutorChip('${T('tut.chipQuiz')}')">${T('tut.chipQuiz')}</span>
+              <span class="chip-pill" onclick="UI.tutorChip('${T('tut.chipAnalogy')}')">${T('tut.chipAnalogy')}</span>
             </div>
           </div>
-          <div class="tutor-input-row">
-            <input class="tutor-input" id="tutorInput" placeholder="输入你的问题..." autocomplete="off"
-              onkeydown="if(event.key==='Enter')UI.tutorSend()">
-            <button class="tutor-send" onclick="UI.tutorSend()" title="发送">
+          <div class="tutor-input-row" style="display:flex;align-items:flex-end;gap:10px">
+            <button class="tutor-send" onclick="UI.tutorAttachImage()" title="${T('chat.attachImage')}" style="width:38px;height:38px;flex-shrink:0">${UI.icon('image', 16)}</button>
+            <div style="flex:1;min-width:0">
+              <div id="tutorImgPreview" style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap"></div>
+              <input class="tutor-input" id="tutorInput" placeholder="${T('tut.placeholder')}" autocomplete="off" style="width:100%"
+                onkeydown="if(event.key==='Enter')UI.tutorSend()">
+            </div>
+            <button class="tutor-send" onclick="UI.tutorSend()" title="Send" style="width:38px;height:38px;flex-shrink:0">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
           </div>
@@ -48,16 +52,23 @@ UI.register('tutor', async (slot) => {
       </div>
     </div>`;
 
-  UI.tutorState = { sessionId: null, courseId: null, lectureId: null, started: false };
+  UI.tutorState = { sessionId: null, courseId: null, lectureId: null, started: false, images: [] };
   UI.loadSessions();
 });
 
 /* 上下文标签更新 */
-UI.loadCtxLabel = function() {
+UI.loadCtxLabel = async function() {
   const label = UI.$('#ctxLabel');
   if (!label) return;
   const cid = UI.tutorState ? UI.tutorState.courseId : null;
-  label.textContent = cid ? '📚 课程 #' + cid : '🌍 全局知识库';
+  if (!cid) { label.textContent = T('tut.globalKB'); return; }
+  try {
+    const r = await eel.api_list_courses()();
+    const c = (r.success ? r.courses : []).find(x => x.id === cid);
+    label.textContent = c ? T('tut.courseLabel', { name: c.name }) : T('tut.courseLabel', { name: '#' + cid });
+  } catch (e) {
+    label.textContent = T('tut.courseLabel', { name: '#' + cid });
+  }
 };
 
 /* 双态切换：问候融入消息流 */
@@ -90,6 +101,7 @@ UI.newTutorSession = async function() {
   if (r.success) {
     UI.tutorState.sessionId = r.session.id;
     UI.tutorState.started = false;
+    UI.tutorState.images = [];
     const inner = UI.$('#tutorMsgInner');
     const msgs = UI.$('#tutorMsgs');
     const ctxline = UI.$('#tutorCtxLine');
@@ -123,31 +135,40 @@ UI.tutorChip = function(text) {
   UI.tutorSend();
 };
 
+/* ── 图片附件 ── */
+UI.tutorAttachImage = async function() {
+  if ((UI.tutorState.images || []).length >= 3) { alert(T('chat.imageLimit')); return; }
+  const r = await eel.api_select_image_file()();
+  if (!r.success) return;
+  UI.tutorState.images.push(r.data_url);
+  const box = UI.$('#tutorImgPreview');
+  if (box) {
+    box.innerHTML = UI.tutorState.images.map((img, i) =>
+      `<span style="position:relative;display:inline-block">
+        <img src="${img}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--border-subtle)">
+        <button onclick="UI.tutorRemoveImage(${i})" style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:var(--red);color:#fff;font-size:10px;line-height:16px;text-align:center">×</button>
+      </span>`).join('');
+  }
+};
+
+UI.tutorRemoveImage = function(i) {
+  UI.tutorState.images.splice(i, 1);
+  const box = UI.$('#tutorImgPreview');
+  if (box) box.innerHTML = UI.tutorState.images.map((img, j) =>
+    `<span style="position:relative;display:inline-block">
+      <img src="${img}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--border-subtle)">
+      <button onclick="UI.tutorRemoveImage(${j})" style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:var(--red);color:#fff;font-size:10px;line-height:16px;text-align:center">×</button>
+    </span>`).join('');
+};
+
 UI.tutorSend = async function() {
   const input = UI.$('#tutorInput');
-  const msg = input.value.trim();
-  if (!msg) return;
-  input.value = '';
+  if (!input.value.trim() && UI.tutorState.images.length === 0) return;
   UI.tutorEnterConversation();
-  const msgs = UI.$('#tutorMsgInner');
-  if (!UI.tutorState.sessionId) {
-    const r = await eel.api_create_chat_session(UI.tutorState.courseId, UI.tutorState.lectureId)();
-    if (r.success) UI.tutorState.sessionId = r.session.id;
-  }
-  msgs.insertAdjacentHTML('beforeend', `<div style="display:flex;justify-content:flex-end;margin-bottom:16px"><div style="max-width:85%;padding:10px 14px;border-radius:16px 16px 4px 16px;background:var(--bg-card);border:1px solid var(--border-subtle);font-size:13px;line-height:1.6">${UI.esc(msg)}</div></div>`);
-  const ai = document.createElement('div');
-  ai.style.cssText = 'display:flex;justify-content:flex-start;margin-bottom:16px';
-  ai.innerHTML = `<div style="max-width:85%;padding:10px 14px;border-radius:16px 16px 16px 4px;background:var(--accent-muted);border:1px solid rgba(124,140,255,0.18);font-size:13px;line-height:1.6;white-space:pre-wrap">✦ AI 正在思考...</div>`;
-  msgs.appendChild(ai);
-  UI.$('#tutorMsgs').scrollTop = UI.$('#tutorMsgs').scrollHeight;
-  try {
-    let buffer = '';
-    const bubble = ai.querySelector('div');
-    UI.updateStream = (c) => { buffer += c; bubble.textContent = buffer; UI.$('#tutorMsgs').scrollTop = UI.$('#tutorMsgs').scrollHeight; };
-    await eel.api_agent_tutor(UI.tutorState.sessionId, msg)();
-    bubble.textContent = buffer || '（无回复）';
-    UI.loadSessions();
-  } catch (e) {
-    ai.querySelector('div').textContent = '❌ ' + e.message;
-  }
+  const state = UI.tutorState;
+  await UI.sendChatMessage(state, input, UI.$('#tutorMsgInner'), UI.$('#tutorMsgs'), state.images);
+  state.images = [];
+  const box = UI.$('#tutorImgPreview');
+  if (box) box.innerHTML = '';
+  UI.loadSessions();
 };

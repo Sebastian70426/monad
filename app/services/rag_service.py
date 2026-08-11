@@ -203,7 +203,7 @@ def _rerank(query, candidates, top_k=5):
 
 # ===== 索引 & 检索 =====
 
-def index_document(doc_id, content, api_key=None):
+def index_document(doc_id, content):
     """将文档内容切块、向量化、存入 ChromaDB。
 
     参数:
@@ -260,16 +260,16 @@ def index_document(doc_id, content, api_key=None):
     return len(texts)
 
 
-def retrieve_context(doc_ids, query, api_key=None, top_k=5):
+def retrieve_context(doc_ids, query, top_k=5):
     """从指定文档中检索与 query 最相关的文本块。
 
     返回: 拼接后的上下文字符串（向后兼容）
     """
-    result = retrieve_with_metadata(doc_ids, query, api_key, top_k)
+    result = retrieve_with_metadata(doc_ids, query, top_k)
     return result["context"]
 
 
-def retrieve_with_metadata(doc_ids, query, api_key=None, top_k=5):
+def retrieve_with_metadata(doc_ids, query, top_k=5):
     """两阶段检索：向量召回 + 交叉编码器精排。
 
     Stage 1 (Recall):  向量检索召回 top_k × 3 条候选

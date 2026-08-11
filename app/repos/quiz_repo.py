@@ -29,14 +29,6 @@ def get_quizzes_by_course(course_id, limit=50):
     )
 
 
-def get_quizzes_by_lecture(lecture_id):
-    """获取某课堂记录的测验题"""
-    return query(
-        "SELECT * FROM quizzes WHERE lecture_id = ? ORDER BY created_at DESC",
-        (lecture_id,)
-    )
-
-
 def delete_quiz(quiz_id):
     """删除测验题"""
     execute("DELETE FROM reviews WHERE quiz_id = ?", (quiz_id,))
@@ -127,11 +119,6 @@ def get_review_by_id(review_id):
     return query_one("SELECT * FROM reviews WHERE id = ?", (review_id,))
 
 
-def get_review_by_quiz(quiz_id):
-    """根据 quiz_id 获取复习记录"""
-    return query_one("SELECT * FROM reviews WHERE quiz_id = ?", (quiz_id,))
-
-
 def get_due_reviews(course_id=None, limit=20):
     """获取今日待复习的题目"""
     today = datetime.now().strftime('%Y-%m-%d')
@@ -183,20 +170,3 @@ def get_review_stats(course_id=None):
         "due_today": due['count'] if due else 0,
         "total": total['count'] if total else 0
     }
-
-
-def _calculate_next_review(quality, ease_factor, interval, repetitions):
-    """计算下次复习日期（首次创建时）"""
-    if quality < 3:
-        reps = 0
-        interval = 1
-    else:
-        reps = repetitions + 1
-        if reps == 1:
-            interval = 1
-        elif reps == 2:
-            interval = 6
-        else:
-            interval = round(interval * ease_factor)
-
-    return (datetime.now() + timedelta(days=interval)).strftime('%Y-%m-%d')

@@ -23,3 +23,7 @@ build/
 # ===== 系统 =====
 .DS_Store
 Thumbs.db
+Monad.dmg
+
+# ===== 工具 =====
+.zcode/

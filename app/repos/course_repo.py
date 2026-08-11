@@ -33,9 +33,3 @@ def set_archived(course_id, archived=True):
     """归档/取消归档课程"""
     execute("UPDATE courses SET archived = ? WHERE id = ?", (1 if archived else 0, course_id))
     return True
-
-
-def delete(course_id):
-    """删除课程（仅删 courses 表，关联数据由调用方处理）"""
-    execute("DELETE FROM courses WHERE id = ?", (course_id,))
-    return True

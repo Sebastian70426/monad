@@ -28,9 +28,3 @@ def update_note(lecture_id, note):
     """更新课堂笔记"""
     execute("UPDATE lectures SET note = ? WHERE id = ?", (note, lecture_id))
     return True
-
-
-def delete_by_course(course_id):
-    """删除某课程下所有课堂记录（级联删除用）"""
-    execute("DELETE FROM lectures WHERE course_id = ?", (course_id,))
-    return True

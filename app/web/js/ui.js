@@ -1,4 +1,5 @@
-/* Monad UI 核心 — 母子菜单 / Popover / 命令中枢 */
+/* Monad UI 核心 — 母子菜单 / Popover / 命令中枢 / i18n */
+const T = (k, p) => I18N.t(k, p);
 const UI = {
   $: (s, r = document) => r.querySelector(s),
   $$: (s, r = document) => [...r.querySelectorAll(s)],
@@ -15,13 +16,14 @@ const UI = {
     plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
     clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
     layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
-    mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
+    mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
+    image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
   },
 
   /* 全局导航（第一级） */
   GNAV: [
-    { sec: '学习', items: [{ page: 'dashboard', ic: 'home', label: '仪表盘' }, { page: 'courses', ic: 'book', label: '课程' }] },
-    { sec: '智能', items: [{ page: 'tutor', ic: 'spark', label: 'AI Tutor' }, { page: 'knowledge', ic: 'brain', label: '知识库' }, { page: 'review', ic: 'refresh', label: '复习' }] },
+    { sec: 'nav.study', items: [{ page: 'dashboard', ic: 'home', key: 'nav.dashboard' }, { page: 'courses', ic: 'book', key: 'nav.courses' }] },
+    { sec: 'nav.ai', items: [{ page: 'tutor', ic: 'spark', key: 'nav.tutor' }, { page: 'knowledge', ic: 'brain', key: 'nav.knowledge' }, { page: 'review', ic: 'refresh', key: 'nav.review' }] },
   ],
   PAGES: {},
   current: null,
@@ -54,9 +56,9 @@ const UI = {
     if (aisub) aisub.classList.toggle('collapsed', page !== 'tutor');
     // 关闭 Popover
     this.hidePopover();
-    // 顶栏标题
-    const t = this.GNAV.flatMap(g => g.items).find(i => i.page === page);
-    if (t && this.$('#tbTitle')) this.$('#tbTitle').textContent = t.label;
+    // 顶栏标题（settings 不在 GNAV 列表，单独处理）
+    const t = this.GNAV.flatMap(g => g.items).find(i => i.page === page) || (page === 'settings' ? { key: 'nav.settings' } : null);
+    if (t && this.$('#tbTitle')) this.$('#tbTitle').textContent = T(t.key);
   },
 
   renderPage(page, params) {
@@ -86,14 +88,14 @@ const UI = {
     const gn = this.$('#gnav');
     if (gn && !gn.dataset.built) {
       gn.dataset.built = '1';
-      let html = `<div class="gnav-logo"><span class="logo-mini">M</span><div><b>Monad</b><small>AI 学习伙伴</small></div></div>`;
+      let html = `<div class="gnav-logo"><span class="logo-mini">M</span><div><b>Monad</b><small>${T('nav.tagline')}</small></div></div>`;
       for (const g of this.GNAV) {
-        html += `<div class="gnav-sec">${g.sec}</div>`;
+        html += `<div class="gnav-sec">${T(g.sec)}</div>`;
         for (const it of g.items) {
-          html += `<div class="gnav-item" data-page="${it.page}">${this.icon(it.ic)}<span>${it.label}</span></div>`;
+          html += `<div class="gnav-item" data-page="${it.page}">${this.icon(it.ic)}<span>${T(it.key)}</span></div>`;
         }
       }
-      html += `<div class="gnav-foot"><div class="gnav-item" data-page="settings">${this.icon('gear')}<span>设置</span></div>
+      html += `<div class="gnav-foot"><div class="gnav-item" data-page="settings">${this.icon('gear')}<span>${T('nav.settings')}</span></div>
         <div class="gnav-user"><span class="avatar">S</span><b>Sebastian</b><span class="dot"></span></div></div>`;
       gn.innerHTML = html;
       this.$$('.gnav-item', gn).forEach(el => {
@@ -106,14 +108,14 @@ const UI = {
     if (ai && !ai.dataset.built) {
       ai.dataset.built = '1';
       ai.innerHTML = `
-        <div class="aisub-icon new" onclick="UI.newGlobalChat()" title="新对话">
-          ${this.icon('plus')}<span class="tip">新对话</span>
+        <div class="aisub-icon new" onclick="UI.newGlobalChat()" title="${T('aisub.newChat')}">
+          ${this.icon('plus')}<span class="tip">${T('aisub.newChat')}</span>
         </div>
-        <div class="aisub-icon" id="aisubHistory" onclick="UI.togglePopover('history', this)" title="历史记录">
-          ${this.icon('clock')}<span class="tip">历史记录</span>
+        <div class="aisub-icon" id="aisubHistory" onclick="UI.togglePopover('history', this)" title="${T('aisub.history')}">
+          ${this.icon('clock')}<span class="tip">${T('aisub.history')}</span>
         </div>
-        <div class="aisub-icon" id="aisubCtx" onclick="UI.togglePopover('context', this)" title="上下文/课程">
-          ${this.icon('layers')}<span class="tip">上下文</span>
+        <div class="aisub-icon" id="aisubCtx" onclick="UI.togglePopover('context', this)" title="${T('aisub.context')}">
+          ${this.icon('layers')}<span class="tip">${T('aisub.context')}</span>
         </div>`;
       ai.classList.add('collapsed');
     }
@@ -123,19 +125,30 @@ const UI = {
     if (tb && !tb.dataset.built) {
       tb.dataset.built = '1';
       tb.innerHTML = `
-        <span class="tb-title" id="tbTitle">仪表盘</span>
-        <span class="status-pill"><span class="pulse"></span>模型就绪 · DeepSeek V4</span>
+        <span class="tb-title" id="tbTitle">${T('nav.dashboard')}</span>
+        <span class="status-pill" id="modelPill"><span class="pulse"></span>${T('topbar.modelReady', { provider: this.providerLabel() })}</span>
         <div class="tb-actions">
           <button class="tb-icon" id="cmdBtn" title="命令面板">${this.icon('search')}<span class="kbd">⌘K</span></button>
-          <button class="lang-toggle" id="langToggle">EN</button>
         </div>`;
       this.$('#cmdBtn').addEventListener('click', () => this.cmdPanel.toggle());
-      this.$('#langToggle').addEventListener('click', () => {
-        const next = localStorage.getItem('language') === 'zh' ? 'en' : 'zh';
-        localStorage.setItem('language', next);
-        location.reload();
-      });
+      // 异步同步后端设置的提供商，更新徽章
+      try {
+        eel.api_get_setting('llm_provider')().then(r => {
+          if (r && r.success && r.value) {
+            localStorage.setItem('llm_provider', r.value);
+            const pill = UI.$('#modelPill');
+            if (pill) pill.innerHTML = `<span class="pulse"></span>${T('topbar.modelReady', { provider: UI.providerLabel() })}`;
+          }
+        }).catch(() => {});
+      } catch (e) {}
     }
+  },
+
+  /* 当前模型提供商的显示名（对应字典 st.p* 键） */
+  providerLabel() {
+    const p = localStorage.getItem('llm_provider') || 'deepseek';
+    const key = 'st.p' + p.charAt(0).toUpperCase() + p.slice(1);
+    return T(key);
   },
 
   /* ═══ Popover 悬浮面板 ═══ */
@@ -163,32 +176,32 @@ const UI = {
   },
 
   renderPopoverHistory(pv) {
-    pv.innerHTML = '<div class="popover-title">历史对话</div><div id="pvSessions">加载中...</div>';
+    pv.innerHTML = `<div class="popover-title">${T('pop.historyTitle')}</div><div id="pvSessions">${T('pop.loading')}</div>`;
     try {
       eel.api_get_chat_sessions(null)().then(r => {
         const el = UI.$('#pvSessions');
         if (!r.success || !r.sessions || r.sessions.length === 0) {
-          el.innerHTML = '<div class="pv-empty">暂无历史对话</div>'; return;
+          el.innerHTML = `<div class="pv-empty">${T('pop.noSessions')}</div>`; return;
         }
         el.innerHTML = r.sessions.slice(0, 30).map(s => `
           <div class="pv-item" onclick="UI.openSessionFromPopover(${s.id})">
             <span>💬</span>
-            <div style="min-width:0"><b>${UI.esc(s.title || '对话 #' + s.id)}</b><small>${s.updated_at}</small></div>
+            <div style="min-width:0"><b>${UI.esc(s.title || T('pop.chatNo', { id: s.id }))}</b><small>${s.updated_at}</small></div>
           </div>`).join('');
       }).catch(() => {});
     } catch (e) {}
   },
 
   renderPopoverContext(pv) {
-    pv.innerHTML = '<div class="popover-title">选择提问范围</div><div id="pvCourses">加载中...</div>';
+    pv.innerHTML = `<div class="popover-title">${T('pop.contextTitle')}</div><div id="pvCourses">${T('pop.loading')}</div>`;
     try {
       eel.api_list_courses()().then(r => {
         const el = UI.$('#pvCourses');
         if (!r.success || !r.courses || r.courses.length === 0) {
-          el.innerHTML = '<div class="pv-empty">还没有课程</div>'; return;
+          el.innerHTML = `<div class="pv-empty">${T('pop.noCourses')}</div>`; return;
         }
         const cur = UI.tutorState ? UI.tutorState.courseId : null;
-        let h = `<div class="pv-item${cur === null ? ' active' : ''}" onclick="UI.pickCtx(null)">🌍 全局知识库</div>`;
+        let h = `<div class="pv-item${cur === null ? ' active' : ''}" onclick="UI.pickCtx(null)">${T('pop.globalKB')}</div>`;
         r.courses.forEach(c => {
           h += `<div class="pv-item${cur === c.id ? ' active' : ''}" onclick="UI.pickCtx(${c.id})">📚 ${UI.esc(c.name)}</div>`;
         });
@@ -233,26 +246,26 @@ const UI = {
     render(filter) {
       const f = (filter || '').trim().toLowerCase();
       const items = [
-        { sec: '操作', list: [
-          { label: '上传新录音', hint: '语音转文字 → AI 笔记', go: 'dashboard' },
-          { label: '唤醒 AI Tutor', hint: '基于课程与知识库问答', go: 'tutor' },
-          { label: '开始复习', hint: 'SM-2 间隔复习', go: 'review' },
-          { label: '打开课程', hint: '课程列表', go: 'courses' },
-          { label: '返回仪表盘', hint: '今日概览', go: 'dashboard' },
-          { label: '打开设置', hint: 'API Key 与语言', go: 'settings' },
+        { sec: 'cmd.section', list: [
+          { label: T('cmd.upload'), hint: T('cmd.uploadHint'), go: 'dashboard' },
+          { label: T('cmd.wake'), hint: T('cmd.wakeHint'), go: 'tutor' },
+          { label: T('cmd.review'), hint: T('cmd.reviewHint'), go: 'review' },
+          { label: T('cmd.courses'), hint: T('cmd.coursesHint'), go: 'courses' },
+          { label: T('cmd.dashboard'), hint: T('cmd.dashboardHint'), go: 'dashboard' },
+          { label: T('cmd.settings'), hint: T('cmd.settingsHint'), go: 'settings' },
         ]},
       ];
       const list = UI.$('#cmdList');
       if (!f) {
         list.innerHTML = items.map(g => `
-          <div class="cmd-sec">${g.sec}</div>` +
+          <div class="cmd-sec">${T(g.sec)}</div>` +
           g.list.map(c => `<div class="cmd-item" onclick="UI.cmdPanel.pick('${c.go}')">${UI.icon(c.go === 'dashboard' ? 'home' : c.go === 'courses' ? 'book' : c.go === 'tutor' ? 'spark' : c.go === 'review' ? 'refresh' : 'gear')}<div><b>${UI.esc(c.label)}</b><small>${UI.esc(c.hint)}</small></div></div>`).join('')
         ).join('');
       } else {
         const matched = items.flatMap(g => g.list).filter(c => (c.label + c.hint).toLowerCase().indexOf(f) >= 0);
         list.innerHTML = matched.length
           ? matched.map(c => `<div class="cmd-item" onclick="UI.cmdPanel.pick('${c.go}')">${UI.icon(c.go === 'dashboard' ? 'home' : c.go === 'courses' ? 'book' : c.go === 'tutor' ? 'spark' : c.go === 'review' ? 'refresh' : 'gear')}<div><b>${UI.esc(c.label)}</b><small>${UI.esc(c.hint)}</small></div></div>`).join('')
-          : '<div class="cmd-empty">没有匹配的命令</div>';
+          : `<div class="cmd-empty">${T('cmd.noMatch')}</div>`;
       }
     },
     pick(page) {
@@ -339,5 +352,136 @@ UI.closeMenu = function() {
   if (UI._menuCloseHandler) {
     document.removeEventListener('click', UI._menuCloseHandler);
     UI._menuCloseHandler = null;
+  }
+};
+
+
+/* ── AI Tutor 会话列表（侧边栏） ── */
+UI.loadSessions = async function() {
+  try {
+    const r = await eel.api_get_chat_sessions(UI.tutorState ? UI.tutorState.courseId : null)();
+    if (!r.success) return;
+    const list = UI.$('#tutorSessionList');
+    if (!list) return;
+    const current = UI.tutorState ? UI.tutorState.sessionId : null;
+    list.innerHTML = r.sessions.map(s => ''
+      + '<div class="session-item' + (s.id === current ? ' active' : '') + '"'
+      + ' onclick="UI.openTutorSession(' + s.id + ')"'
+      + ' style="padding:8px 12px;cursor:pointer;font-size:12px;border-radius:8px;'
+      + (s.id === current ? 'background:var(--accent-muted);' : '')
+      + 'display:flex;justify-content:space-between;align-items:center">'
+      + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">' + UI.esc(s.title || T('tut.newChat')) + '</span>'
+      + '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();UI.deleteTutorSession(' + s.id + ')"'
+      + ' style="padding:2px 6px;font-size:10px;opacity:0.5">×</button>'
+      + '</div>'
+    ).join('') || `<div style="padding:12px;text-align:center;font-size:11px;color:var(--text-tertiary)">${T('tut.noSessions')}</div>`;
+  } catch (e) {}
+};
+
+UI.deleteTutorSession = async function(sid) {
+  await eel.api_delete_chat_session(sid)();
+  if (UI.tutorState && UI.tutorState.sessionId === sid) {
+    UI.tutorState.sessionId = null;
+    UI.tutorState.started = false;
+    const inner = UI.$('#tutorMsgInner');
+    const msgs = UI.$('#tutorMsgs');
+    const ctxline = UI.$('#tutorCtxLine');
+    if (inner) inner.innerHTML = '';
+    if (msgs) msgs.style.display = 'none';
+    if (ctxline) ctxline.style.display = 'none';
+  }
+  UI.loadSessions();
+};
+
+
+/* ── Eel 流式回调（供 Python 调用） ── */
+/* 注意：eel 在 init 时用静态语法解析 eel.expose 调用注册；
+   必须用「先定义函数、再按引用暴露」的写法，且注释里不能出现 eel.expose 加括号，
+   否则静态扫描会被注释内容截断。 */
+
+function start_tutor_stream(sources) {
+  /* Python 推送来源信息时可在此处理 */
+}
+eel.expose(start_tutor_stream, 'start_tutor_stream');
+
+function update_tutor_stream(chunk) {
+  if (UI.updateStream) UI.updateStream(chunk);
+}
+eel.expose(update_tutor_stream, 'update_tutor_stream');
+
+function end_tutor_stream() {
+  /* Python 通知流式结束时调用 */
+}
+eel.expose(end_tutor_stream, 'end_tutor_stream');
+
+function start_note_stream() {}
+eel.expose(start_note_stream, 'start_note_stream');
+
+function update_note_stream(chunk) {
+  /* 笔记流式输出（当前 UI 等待整体完成后刷新，此处预留实时预览） */
+}
+eel.expose(update_note_stream, 'update_note_stream');
+
+function end_note_stream() {}
+eel.expose(end_note_stream, 'end_note_stream');
+
+/* 文档索引进度回调（Python 后台索引线程推送） */
+function update_index_progress(did, status, count) {
+  UI.indexStatus(did, status, count);
+}
+eel.expose(update_index_progress, 'update_index_progress');
+
+/* 文档索引状态：知识库页状态条 + 完成后刷新列表（其他页面时静默） */
+UI.indexStatus = function(did, status, count) {
+  const kbStatus = UI.$('#kbStatus');
+  if (!kbStatus) return;
+  const show = (text, type) => {
+    kbStatus.classList.remove('hidden');
+    kbStatus.style.color = type === 'ok' ? 'var(--green)' : type === 'err' ? 'var(--red)' : 'var(--text-primary)';
+    kbStatus.textContent = text;
+    if (type) setTimeout(() => kbStatus.classList.add('hidden'), 3000);
+  };
+  if (status === 'indexing') show(T('idx.indexing'));
+  else if (status === 'done') show(T('idx.done', { count }), 'ok');
+  else if (status === 'no_key') show(T('idx.noKey'), 'err');
+  else show(T('idx.fail', { err: count || status }), 'err');
+  if (typeof UI.kbLoadDocs === 'function') {
+    const sel = UI.$('#kbCourseSelect');
+    UI.kbLoadDocs(sel ? sel.value : null);
+  }
+};
+
+/* 统一的聊天发送：创建会话 → 渲染气泡 → 流式接收（course 页与 tutor 页共用）
+   images: 可选图片 data URL 数组（多模态，最多 3 张） */
+UI.sendChatMessage = async function(state, inputEl, msgsEl, scrollEl, images) {
+  const msg = inputEl.value.trim();
+  if (!msg && !(images && images.length)) return;
+  // 先确保会话存在，失败则中止（避免用 null sessionId 调后端）
+  if (!state.sessionId) {
+    try {
+      const r = await eel.api_create_chat_session(state.courseId, state.lectureId)();
+      if (!r.success) { alert(T('chat.createFail', { err: r.error || T('chat.unknown') })); return; }
+      state.sessionId = r.session.id;
+    } catch (e) { alert(T('chat.createFail', { err: e.message })); return; }
+  }
+  inputEl.value = '';
+  const imgTag = images && images.length ? `<div style="font-size:11px;color:var(--text-tertiary);margin-top:6px">${T('chat.imageTag')} ×${images.length}</div>` : '';
+  msgsEl.insertAdjacentHTML('beforeend', `<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><div style="max-width:85%;padding:10px 14px;border-radius:14px 14px 4px 14px;background:var(--bg-card);border:1px solid var(--border-subtle);font-size:13px;line-height:1.6">${UI.esc(msg)}${imgTag}</div></div>`);
+  scrollEl.scrollTop = scrollEl.scrollHeight;
+
+  const aiBubble = document.createElement('div');
+  aiBubble.style.cssText = 'display:flex;justify-content:flex-start;margin-bottom:14px';
+  aiBubble.innerHTML = `<div style="max-width:85%;padding:10px 14px;border-radius:14px 14px 14px 4px;background:var(--accent-muted);border:1px solid rgba(124,140,255,0.18);font-size:13px;line-height:1.6;white-space:pre-wrap">${T('chat.thinking')}</div>`;
+  msgsEl.appendChild(aiBubble);
+  scrollEl.scrollTop = scrollEl.scrollHeight;
+
+  try {
+    let buffer = '';
+    const bubble = aiBubble.querySelector('div');
+    UI.updateStream = (chunk) => { buffer += chunk; bubble.textContent = buffer; scrollEl.scrollTop = scrollEl.scrollHeight; };
+    await eel.api_tutor_chat(state.sessionId, msg, images || [])();
+    bubble.textContent = buffer || T('chat.noReply');
+  } catch (e) {
+    bubble.textContent = '❌ ' + e.message;
   }
 };

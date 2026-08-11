@@ -1,14 +1,12 @@
 # ===== Web 框架 =====
 eel
 
-# ===== 语音转写 =====
-faster-whisper
+# ===== 语音转写（Groq Whisper API） =====
+groq
 
 # ===== LLM API =====
 openai
-
-# ===== 音频处理 =====
-pydub
+google-genai
 
 # ===== RAG 向量检索 =====
 chromadb
@@ -19,4 +17,3 @@ sentence-transformers
 # ===== 文档解析 =====
 PyMuPDF
 python-pptx
-groq

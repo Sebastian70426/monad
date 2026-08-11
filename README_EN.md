@@ -26,7 +26,7 @@ An AI-powered learning assistant for university students. Upload lecture recordi
    - On Windows, check "Add Python to PATH"
 3. Launch:
    - **Mac**: Double-click `start.command`
-   - **Windows**: Double-click `start.bat`
+   - **Windows**: Run `python app/main.py` (no `start.bat` yet)
 4. First launch will auto-install dependencies (~5-10 min)
 5. App opens automatically after installation
 
@@ -68,11 +68,9 @@ monad/
 ├── README.md           # Project documentation
 ├── requirements.txt    # Python dependencies
 ├── start.command       # Mac one-click launcher
-├── start.bat           # Windows one-click launcher
 ├── .gitignore
 ├── docs/               # Technical documentation
 │   ├── architecture.md # Architecture diagrams
-│   ├── adr.md          # Architecture Decision Records
 │   └── benchmarks.md   # Performance benchmarks
 ├── data/               # Runtime data (auto-created, not committed)
 │   ├── database.db

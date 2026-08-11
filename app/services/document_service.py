@@ -2,48 +2,7 @@ import os
 import fitz
 
 
-def extract_text_from_pdf(file_path):
-    doc = fitz.open(file_path)
-    text_parts = []
-    for page in doc:
-        text = page.get_text()
-        if text.strip():
-            text_parts.append(text)
-    doc.close()
-    return "\n\n".join(text_parts)
-
-
-def extract_text_from_pptx(file_path):
-    from pptx import Presentation
-    prs = Presentation(file_path)
-    text_parts = []
-    for slide in prs.slides:
-        for shape in slide.shapes:
-            if shape.has_text_frame:
-                for paragraph in shape.text_frame.paragraphs:
-                    text = paragraph.text.strip()
-                    if text:
-                        text_parts.append(text)
-    return "\n".join(text_parts)
-
-
-def extract_text_from_txt(file_path):
-    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-        return f.read()
-
-
-def extract_text(file_path, file_type):
-    if file_type == '.pdf':
-        return extract_text_from_pdf(file_path)
-    elif file_type == '.pptx':
-        return extract_text_from_pptx(file_path)
-    elif file_type in ['.txt', '.md']:
-        return extract_text_from_txt(file_path)
-    else:
-        raise ValueError(f"Unsupported file type: {file_type}")
-
-
-# ===== 结构化提取（Phase 2 新增）=====
+# ===== 结构化提取（保留结构信息：页码/幻灯片号） =====
 
 def extract_structured(file_path, file_type, filename):
     """提取文本并保留结构信息（页码/幻灯片号）。
@@ -103,3 +62,30 @@ def _extract_txt_structured(file_path, filename):
     for i, para in enumerate(paragraphs):
         sections.append({"text": para, "page": i + 1, "source": filename})
     return sections
+
+
+# ===== 图片文档（视觉模型提取） =====
+
+IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp']
+
+
+def extract_image_text(file_path, filename):
+    """用多模态模型提取图片中的全部文字与图表内容。
+
+    返回: [{"text": str, "page": 1, "source": filename}]
+    """
+    from services.llm_client import get_llm_client, image_to_data_url
+    client = get_llm_client()
+    data_url = image_to_data_url(file_path)
+    prompt = ("你是 OCR 与图表识别助手。请完整提取图片中的全部文字内容（保留段落与标题层级，"
+              "公式用纯文本如 F = m * a），并简要描述图中的图表、结构或示意。"
+              "若图片几乎没有文字，请用中文描述图片内容。")
+    text = client.chat(
+        messages=[{"role": "user", "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": data_url}},
+        ]}],
+        temperature=0.2,
+        max_tokens=3000
+    )
+    return [{"text": text or "", "page": 1, "source": filename}]

@@ -2,7 +2,7 @@
 import sys, os
 from PyInstaller.utils.hooks import collect_data_files
 
-root = '/Users/sebastian/Desktop/monad'
+root = os.path.dirname(os.path.abspath(SPEC))
 
 eel_datas = collect_data_files('eel')
 
@@ -19,8 +19,8 @@ a = Analysis(
     datas=added_files,
     hiddenimports=[
         'eel', 'eel.browsers',
-        'faster_whisper', 'openai', 'chromadb',
-        'sentence_transformers', 'pydub', 'fitz', 'pptx', 'groq',
+        'openai', 'chromadb',
+        'sentence_transformers', 'fitz', 'pptx', 'groq',
         'PIL', 'numpy', 'torch', 'transformers', 'tokenizers',
     ],
     hookspath=[],

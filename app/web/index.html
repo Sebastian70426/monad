@@ -14,13 +14,13 @@
   <div class="splash-inner">
     <div class="logo-wrap"><span class="logo-ring"></span><span class="logo-core">M</span></div>
     <div class="splash-name">MONAD</div>
-    <div class="splash-sub">Initializing AI Engine</div>
+    <div class="splash-sub" data-i18n="splash.sub"></div>
     <div class="splash-steps">
-      <div class="s-step"><span class="s-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.1 5.4L19.5 10.5l-5.4 2.1L12 18l-2.1-5.4L4.5 10.5l5.4-2.1z"/></svg></span><span>AI Model</span><span class="s-check">✓</span></div>
-      <div class="s-step"><span class="s-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2z"/><path d="M4 19a2 2 0 0 1 2-2h14"/></svg></span><span>Knowledge Base</span><span class="s-check">✓</span></div>
-      <div class="s-step"><span class="s-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></span><span>Learning Memory</span><span class="s-check">✓</span></div>
+      <div class="s-step"><span class="s-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.1 5.4L19.5 10.5l-5.4 2.1L12 18l-2.1-5.4L4.5 10.5l5.4-2.1z"/></svg></span><span data-i18n="splash.model">AI Model</span><span class="s-check">✓</span></div>
+      <div class="s-step"><span class="s-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2z"/><path d="M4 19a2 2 0 0 1 2-2h14"/></svg></span><span data-i18n="splash.kb">Knowledge Base</span><span class="s-check">✓</span></div>
+      <div class="s-step"><span class="s-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></span><span data-i18n="splash.memory">Learning Memory</span><span class="s-check">✓</span></div>
     </div>
-    <div class="splash-welcome"><span class="w-spark">✦</span> Welcome back, Sebastian</div>
+    <div class="splash-welcome" data-i18n="splash.welcome" data-i18n-params='{"name":"Sebastian"}'></div>
   </div>
 </div>
 
@@ -55,7 +55,10 @@
 </div>
 
 <script src="/eel.js"></script>
-<script src="js/api.js"></script>
+<script src="js/i18n/zh.js"></script>
+<script src="js/i18n/en.js"></script>
+<script src="js/i18n/ja.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/pages/dashboard.js"></script>
 <script src="js/pages/courses.js"></script>

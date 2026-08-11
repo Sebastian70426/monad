@@ -1,6 +1,6 @@
 import json
 import logging
-from openai import OpenAI
+from services.llm_client import get_llm_client
 from repos import quiz_repo, course_repo, lecture_repo, document_repo
 from services.rag_service import retrieve_context
 
@@ -39,20 +39,16 @@ QUIZ_PROMPT = """你是一位大学考试出题专家。请根据以下课程内
 """
 
 
-def generate_quizzes(course_id, lecture_id=None, api_key=None):
+def generate_quizzes(course_id, lecture_id=None):
     """从笔记/文档内容生成测验题
 
     参数:
         course_id: 课程 ID
         lecture_id: 课堂记录 ID（可选，指定则从该课堂笔记生成）
-        api_key: DeepSeek API Key
 
     返回:
         {"success": True, "quizzes": [...], "count": N}
     """
-    if not api_key:
-        return {"success": False, "error": "缺少 API Key"}
-
     # 收集内容
     content = _gather_content(course_id, lecture_id)
     if not content or len(content.strip()) < 50:
@@ -60,7 +56,7 @@ def generate_quizzes(course_id, lecture_id=None, api_key=None):
 
     # 调用 LLM
     try:
-        raw = _call_llm(content, api_key)
+        raw = _call_llm(content)
         quizzes = _parse_quizzes(raw)
     except Exception as e:
         logger.warning(f"LLM 生成测验题失败: {e}", exc_info=True)
@@ -141,12 +137,10 @@ def _gather_content(course_id, lecture_id=None):
     return "\n\n".join(parts) if parts else ""
 
 
-def _call_llm(content, api_key):
-    """调用 DeepSeek API 生成测验题"""
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-
-    response = client.chat.completions.create(
-        model="deepseek-v4-flash",
+def _call_llm(content):
+    """调用当前配置的模型提供商生成测验题"""
+    client = get_llm_client()
+    return client.chat(
         messages=[
             {"role": "system", "content": QUIZ_PROMPT},
             {"role": "user", "content": content}
@@ -154,8 +148,6 @@ def _call_llm(content, api_key):
         temperature=0.7,
         max_tokens=2000
     )
-
-    return response.choices[0].message.content
 
 
 def _parse_quizzes(raw_text):

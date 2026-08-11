@@ -25,7 +25,7 @@ An AI-powered learning assistant for university students. Upload lecture recordi
 2. Install Python 3.10+ from https://www.python.org/downloads/
 3. Launch:
    - **Mac**: Double-click `start.command`
-   - **Windows**: Double-click `start.bat`
+   - **Windows**: 运行 `python app/main.py`（暂未提供 start.bat）
 4. First launch auto-installs dependencies (~5-10 min)
 5. App opens automatically after installation
 
@@ -67,11 +67,9 @@ Open the app → go to **Settings**, configure two API keys:
     ├── README.md
     ├── requirements.txt
     ├── start.command
-    ├── start.bat
     ├── .gitignore
     ├── docs/
     │   ├── architecture.md
-    │   ├── adr.md
     │   └── benchmarks.md
     ├── data/
     └── app/

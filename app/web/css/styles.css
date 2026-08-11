@@ -4,8 +4,11 @@ html,body{height:100%;width:100%;overflow:hidden}
 body{
   font-family:var(--font-sans);font-size:var(--text-base);line-height:1.5;
   color:var(--text-primary);background:var(--bg-window);
-  -webkit-font-smoothing:antialiased;user-select:none;
+  -webkit-font-smoothing:antialiased;
 }
+/* 内容区域允许选中复制；UI 骨架（导航/按钮）保持不可选中 */
+.page-view, .page-view input, .page-view textarea{user-select:text;-webkit-user-select:text}
+.gnav,.aisub,.topbar,.btn,.chip-pill,.stat-card,.splash{user-select:none;-webkit-user-select:none}
 :lang(zh){letter-spacing:0;line-height:1.7}
 ::selection{background:rgba(124,140,255,0.32);color:#fff}
 ::-webkit-scrollbar{width:4px;height:4px}

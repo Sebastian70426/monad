@@ -15,20 +15,14 @@ S = 记忆强度 (越大越不容易忘)
 复习触发阈值: R < 0.7 时建议立即复习
 """
 import math
-import logging
 from datetime import datetime
 from repos import quiz_repo
 from db import query, execute
-
-logger = logging.getLogger(__name__)
 
 # 默认参数
 DEFAULT_STRENGTH = 1.0       # 初始记忆强度
 REVIEW_THRESHOLD = 0.7       # 保留度低于此值时建议复习
 MAX_STRENGTH = 60.0          # 记忆强度上限（约2个月后仍保留70%+）
-
-# 艾宾浩斯经典复习节点（天）
-CLASSIC_INTERVALS = [1, 2, 4, 7, 15, 30]
 
 
 def calculate_retention(memory_strength, days_since_review):
@@ -110,70 +104,6 @@ def get_review_with_curve(review_id):
     }
 
 
-def get_all_curves(course_id=None):
-    """获取所有复习记录的遗忘曲线数据"""
-    today = datetime.now().strftime('%Y-%m-%d')
-    if course_id:
-        reviews = query(
-            "SELECT r.id, r.quiz_id, r.next_review, r.last_review, "
-            "q.course_id, q.question, q.answer, q.options, q.difficulty "
-            "FROM reviews r JOIN quizzes q ON r.quiz_id = q.id "
-            "WHERE q.course_id = ?",
-            (course_id,)
-        )
-    else:
-        reviews = query(
-            "SELECT r.id, r.quiz_id, r.next_review, r.last_review, "
-            "q.course_id, q.question, q.answer, q.options, q.difficulty "
-            "FROM reviews r JOIN quizzes q ON r.quiz_id = q.id"
-        )
-
-    results = []
-    for r in reviews:
-        curve = get_review_with_curve(r['id'])
-        if curve:
-            curve['question'] = r['question']
-            curve['difficulty'] = r.get('difficulty', 'medium')
-            results.append(curve)
-
-    # 按保留度升序（最该复习的排前面）
-    results.sort(key=lambda x: x['current_retention'])
-    return results
-
-
-def get_curve_chart_data(review_id):
-    """生成遗忘曲线图表数据（用于前端可视化）
-
-    返回: [{"day": 0, "retention": 1.0}, {"day": 1, "retention": 0.85}, ...]
-    """
-    curve = get_review_with_curve(review_id)
-    if not curve:
-        return []
-
-    strength = curve['memory_strength']
-    if strength <= 0:
-        return []
-
-    # 生成 0~30 天的曲线数据
-    chart_data = []
-    for day in range(31):
-        r = calculate_retention(strength, day)
-        chart_data.append({
-            "day": day,
-            "retention": round(r, 4),
-            "is_threshold": r < REVIEW_THRESHOLD,
-            "is_today": abs(day - curve['days_since_review']) < 0.5
-        })
-
-    return {
-        "chart_data": chart_data,
-        "current_day": round(curve['days_since_review'], 1),
-        "current_retention": curve['current_retention'],
-        "memory_strength": strength,
-        "optimal_interval": curve['optimal_interval_days']
-    }
-
-
 def log_review(review_id, quality, retention_before):
     """记录复习日志（含记忆强度变化）"""
     # 获取当前记忆强度
@@ -197,42 +127,3 @@ def log_review(review_id, quality, retention_before):
         "retention_before": round(retention_before, 4),
         "retention_after": round(retention_after, 4)
     }
-
-
-def get_course_stats(course_id=None):
-    """获取课程级别的遗忘曲线统计"""
-    curves = get_all_curves(course_id)
-    if not curves:
-        return {
-            "total": 0,
-            "avg_retention": 0,
-            "needs_review": 0,
-            "mastered": 0,
-            "avg_strength": 0
-        }
-
-    total = len(curves)
-    needs_review = sum(1 for c in curves if c['needs_review'])
-    mastered = sum(1 for c in curves if c['current_retention'] >= 0.85)
-    avg_retention = sum(c['current_retention'] for c in curves) / total
-    avg_strength = sum(c['memory_strength'] for c in curves) / total
-
-    return {
-        "total": total,
-        "avg_retention": round(avg_retention, 4),
-        "needs_review": needs_review,
-        "mastered": mastered,
-        "avg_strength": round(avg_strength, 2)
-    }
-
-
-def get_classic_schedule():
-    """返回艾宾浩斯经典复习节点"""
-    return [
-        {"day": 1, "label": "第1天", "retention": round(calculate_retention(DEFAULT_STRENGTH, 1), 4)},
-        {"day": 2, "label": "第2天", "retention": round(calculate_retention(DEFAULT_STRENGTH, 2), 4)},
-        {"day": 4, "label": "第4天", "retention": round(calculate_retention(DEFAULT_STRENGTH, 4), 4)},
-        {"day": 7, "label": "第7天", "retention": round(calculate_retention(DEFAULT_STRENGTH, 7), 4)},
-        {"day": 15, "label": "第15天", "retention": round(calculate_retention(DEFAULT_STRENGTH, 15), 4)},
-        {"day": 30, "label": "第30天", "retention": round(calculate_retention(DEFAULT_STRENGTH, 30), 4)},
-    ]

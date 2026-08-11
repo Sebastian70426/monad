@@ -59,14 +59,6 @@ def get_dependencies(point_id):
     )
 
 
-def get_dependents(point_id):
-    """获取依赖某知识点的后续知识点"""
-    return query(
-        "SELECT point_id FROM knowledge_dependencies WHERE depends_on_id = ?",
-        (point_id,)
-    )
-
-
 # ========== Quiz-Knowledge Link ==========
 
 def link_quiz(quiz_id, point_id):
@@ -84,16 +76,6 @@ def get_points_by_quiz(quiz_id):
         "JOIN quiz_knowledge_points qkp ON kp.id = qkp.point_id "
         "WHERE qkp.quiz_id = ?",
         (quiz_id,)
-    )
-
-
-def get_quizzes_by_point(point_id):
-    """获取某知识点关联的测验题"""
-    return query(
-        "SELECT q.* FROM quizzes q "
-        "JOIN quiz_knowledge_points qkp ON q.id = qkp.quiz_id "
-        "WHERE qkp.point_id = ?",
-        (point_id,)
     )
 
 

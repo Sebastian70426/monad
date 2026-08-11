@@ -1,17 +1,16 @@
 import os
 import logging
-from openai import OpenAI
+from services.llm_client import get_llm_client
 from services.rag_service import retrieve_with_metadata
 from repos import chat_repo, document_repo
 
 logger = logging.getLogger(__name__)
 
 
-def _detect_intent(message, api_key):
+def _detect_intent(message):
     """用 LLM 判断用户问题的意图类型。"""
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-    response = client.chat.completions.create(
-        model="deepseek-v4-flash",
+    client = get_llm_client()
+    response = client.chat(
         messages=[{
             "role": "system",
             "content": """你是一个意图分类器。根据用户的问题,返回以下类型之一:
@@ -30,7 +29,7 @@ def _detect_intent(message, api_key):
         temperature=0,
         max_tokens=20
     )
-    intent = response.choices[0].message.content.strip().lower()
+    intent = (response or '').strip().lower()
     valid = ["concept_explain", "equation_help", "exam_question", "summarize", "general"]
     return intent if intent in valid else "general"
 
@@ -60,7 +59,7 @@ def _load_history(session_id, n=6):
     return chat_repo.get_recent_history(session_id, n)
 
 
-def _retrieve(course_id, lecture_id, message, api_key):
+def _retrieve(course_id, lecture_id, message):
     """检索相关课程资料，返回 (context, sources)"""
     doc_ids = []
     if course_id:
@@ -71,7 +70,7 @@ def _retrieve(course_id, lecture_id, message, api_key):
         return "", []
 
     try:
-        result = retrieve_with_metadata(doc_ids, message, api_key, top_k=5)
+        result = retrieve_with_metadata(doc_ids, message, top_k=5)
         sources = [
             {"page": s.get("page"), "source": s.get("source")}
             for s in result["sources"]
@@ -83,8 +82,8 @@ def _retrieve(course_id, lecture_id, message, api_key):
         return "", []
 
 
-def _build_messages(intent, history, rag_context, message):
-    """组装对话消息列表"""
+def _build_messages(intent, history, rag_context, message, images=None):
+    """组装对话消息列表；images 为图片 data URL 列表（多模态）"""
     system_prompt = _load_prompt(intent)
 
     if rag_context:
@@ -93,58 +92,31 @@ def _build_messages(intent, history, rag_context, message):
     messages = [{"role": "system", "content": system_prompt}]
     for h in history:
         messages.append({"role": h['role'], "content": h['content']})
-    messages.append({"role": "user", "content": message})
+    if images:
+        user_parts = [{"type": "text", "text": message}]
+        for img in images:
+            user_parts.append({"type": "image_url", "image_url": {"url": img}})
+        messages.append({"role": "user", "content": user_parts})
+    else:
+        messages.append({"role": "user", "content": message})
     return messages
 
 
-def _generate(intent, history, rag_context, message, api_key):
-    """非流式生成"""
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-    messages = _build_messages(intent, history, rag_context, message)
+def _generate_stream(intent, history, rag_context, message, images=None):
+    """流式生成，yield 每个 chunk（按当前配置的模型提供商）"""
+    client = get_llm_client()
+    messages = _build_messages(intent, history, rag_context, message, images)
 
-    response = client.chat.completions.create(
-        model="deepseek-v4-flash",
-        messages=messages,
-        temperature=0.7,
-        max_tokens=2000
-    )
-    return response.choices[0].message.content
+    for chunk in client.chat_stream(messages, temperature=0.7, max_tokens=2000):
+        yield chunk
 
 
-def _generate_stream(intent, history, rag_context, message, api_key):
-    """流式生成，yield 每个 chunk"""
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-    messages = _build_messages(intent, history, rag_context, message)
-
-    response = client.chat.completions.create(
-        model="deepseek-v4-flash",
-        messages=messages,
-        temperature=0.7,
-        max_tokens=2000,
-        stream=True
-    )
-
-    for chunk in response:
-        if chunk.choices and chunk.choices[0].delta.content:
-            yield chunk.choices[0].delta.content
-
-
-def tutor_chat(session_id, course_id, lecture_id, message, api_key):
-    """非流式版"""
-    intent = _detect_intent(message, api_key)
-    history = _load_history(session_id)
-    rag_context, sources = _retrieve(course_id, lecture_id, message, api_key)
-    reply = _generate(intent, history, rag_context, message, api_key)
-
-    return {"reply": reply, "sources": sources, "intent": intent}
-
-
-def tutor_chat_stream(session_id, course_id, lecture_id, message, api_key):
+def tutor_chat_stream(session_id, course_id, lecture_id, message, images=None):
     """流式版：返回 sources + 生成器"""
-    intent = _detect_intent(message, api_key)
+    intent = _detect_intent(message)
     history = _load_history(session_id)
-    rag_context, sources = _retrieve(course_id, lecture_id, message, api_key)
+    rag_context, sources = _retrieve(course_id, lecture_id, message)
 
-    stream = _generate_stream(intent, history, rag_context, message, api_key)
+    stream = _generate_stream(intent, history, rag_context, message, images)
 
     return {"sources": sources, "intent": intent, "stream": stream}

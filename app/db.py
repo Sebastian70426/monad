@@ -121,6 +121,17 @@ def init_db():
             FOREIGN KEY (quiz_id) REFERENCES quizzes(id)
         );
 
+        CREATE TABLE IF NOT EXISTS review_logs (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            review_id        INTEGER NOT NULL,
+            quality          INTEGER NOT NULL,
+            retention_before REAL,
+            retention_after  REAL,
+            memory_strength  REAL,
+            reviewed_at      TEXT    DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (review_id) REFERENCES reviews(id)
+        );
+
         CREATE TABLE IF NOT EXISTS knowledge_points (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             course_id   INTEGER NOT NULL,
@@ -159,11 +170,11 @@ def init_db():
         );
         ''')
 
-    # 兼容旧库：如果 courses 表缺 archived 列则补上
-    try:
-        conn.execute("ALTER TABLE courses ADD COLUMN archived INTEGER DEFAULT 0")
-    except Exception:
-        pass
+    # 兼容旧库：courses 表缺 archived 列则补上（新库建表已包含）
+    with get_db() as conn:
+        cols = [row['name'] for row in conn.execute("PRAGMA table_info(courses)").fetchall()]
+        if 'archived' not in cols:
+            conn.execute("ALTER TABLE courses ADD COLUMN archived INTEGER DEFAULT 0")
 
 
 def execute(sql, params=()):

@@ -54,12 +54,6 @@ def delete(doc_id):
     return True
 
 
-def delete_by_course(course_id):
-    """删除某课程下所有文档（级联删除用）"""
-    execute("DELETE FROM documents WHERE course_id = ?", (course_id,))
-    return True
-
-
 def get_meta_with_path_by_course(course_id):
     """获取某课程下所有文档元数据（含 file_path，用于显示文件大小）"""
     return query(
