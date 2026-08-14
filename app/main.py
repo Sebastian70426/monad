@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import filedialog
 import os
 import time
+import threading
 from openai import OpenAI
 from db import init_db
 from config import LLM_TEMPERATURE, LLM_MAX_TOKENS, MAX_DOC_SIZE_MB
@@ -105,6 +106,19 @@ def _require_llm_key():
     if not settings_repo.get(meta['key_setting']):
         return f"请先在设置页配置 {meta['label']} API Key"
     return None
+
+
+# 每个文档一把索引锁：上传后的自动索引与手动"重索引"并发时会互相删除
+# 对方的 Chroma 集合导致 "Collection does not exist"，这里串行化同一文档的索引操作
+_index_locks = {}
+_index_locks_guard = threading.Lock()
+
+
+def _get_index_lock(doc_id):
+    with _index_locks_guard:
+        if doc_id not in _index_locks:
+            _index_locks[doc_id] = threading.Lock()
+        return _index_locks[doc_id]
 
 # ========== 课程管理 ==========
 
@@ -353,11 +367,18 @@ def api_upload_document(file_path, course_id):
                 eel.update_index_progress(did, "no_key", 0)()
                 return
             eel.update_index_progress(did, "indexing", 0)()
-            chunk_count = index_document(did, secs)
-            document_repo.update_chunk_count(did, chunk_count)
+            with _get_index_lock(did):
+                chunk_count = index_document(did, secs)
+                document_repo.update_chunk_count(did, chunk_count)
             eel.update_index_progress(did, "done", chunk_count)()
         except Exception as e:
-            eel.update_index_progress(did, "error", str(e))()
+            import traceback
+            print(f"[index] doc#{did} indexing failed: {e}", flush=True)
+            traceback.print_exc()
+            try:
+                eel.update_index_progress(did, "error", str(e))()
+            except Exception:
+                pass
 
     thread = threading.Thread(target=_background_index, args=(doc_id, sections), daemon=True)
     thread.start()
@@ -824,10 +845,14 @@ def api_reindex_document(doc_id):
         return {"success": False, "error": "文档不存在"}
     try:
         sections = extract_structured(doc['file_path'], doc['file_type'], doc['filename'])
-        chunk_count = index_document(doc['id'], sections)
-        document_repo.update_chunk_count(doc['id'], chunk_count)
+        with _get_index_lock(doc['id']):
+            chunk_count = index_document(doc['id'], sections)
+            document_repo.update_chunk_count(doc['id'], chunk_count)
         return {"success": True, "chunk_count": chunk_count}
     except Exception as e:
+        import traceback
+        print(f"[index] doc#{doc['id']} reindex failed: {e}", flush=True)
+        traceback.print_exc()
         return {"success": False, "error": str(e)}
 
 
